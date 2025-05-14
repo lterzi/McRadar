@@ -1,0 +1,25 @@
+[build-system]
+requires      = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcradar"
+version = "1.0.0"
+description = "Radar forward operator for McSnow output using DDA scattering LUTs"
+readme = "README.md"
+authors = [{ name = "Leonie", email = "l.terzi@lmu.de" }]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
+keywords = ["radar forward simulation"]
+dependencies = [
+    "xarray",
+    "pandas",
+    "numpy",
+    "scipy",
+    "netCDF4",
+    "scikit-learn",
+]
+requires-python = ">=3.9"
