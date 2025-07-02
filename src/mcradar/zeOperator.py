@@ -17,174 +17,6 @@ debugging = False
 onlyInterp = False
 
 # TODO: this function should deal with the LUTs
-def calcScatPropOneFreq(wl, radii, as_ratio, 
-                        rho, elv, ndgs=30,
-                        canting=False, cantingStd=1, 
-                        meanAngle=0, safeTmatrix=False):
-    from pytmatrix.tmatrix import Scatterer
-    from pytmatrix import psd, orientation, radar
-    from pytmatrix import refractive, tmatrix_aux
-
-    """
-    Calculates the Ze at H and V polarization, Kdp for one wavelength
-    TODO: LDR???
-    
-    Parameters
-    ----------
-    wl: wavelength [mm] (single value)
-    radii: radius [mm] of the particle (array[n])
-    as_ratio: aspect ratio of the super particle (array[n])
-    rho: density [g/mmˆ3] of the super particle (array[n])
-    elv: elevation angle [°]
-    ndgs: division points used to integrate over the particle surface
-    canting: boolean (default = False)
-    cantingStd: standard deviation of the canting angle [°] (default = 1)
-    meanAngle: mean value of the canting angle [°] (default = 0)
-    
-    Returns
-    -------
-    reflect_h: super particle horizontal reflectivity[mm^6/m^3] (array[n])
-    reflect_v: super particle vertical reflectivity[mm^6/m^3] (array[n])
-    refIndex: refractive index from each super particle (array[n])
-    kdp: calculated kdp from each particle (array[n])
-    """
-    
-    #---pyTmatrix setup
-    # initialize a scatterer object
-    scatterer = Scatterer(wavelength=wl)
-    scatterer.radius_type = Scatterer.RADIUS_MAXIMUM
-    scatterer.ndgs = ndgs
-    scatterer.ddelta = 1e-6
-
-    if canting==True: 
-        scatterer.or_pdf = orientation.gaussian_pdf(std=cantingStd, mean=meanAngle)  
-#         scatterer.orient = orientation.orient_averaged_adaptive
-        scatterer.orient = orientation.orient_averaged_fixed
-    
-    # geometric parameters - incident direction
-    scatterer.thet0 = 90. - elv
-    scatterer.phi0 = 0.
-    
-    # parameters for backscattering
-    refIndex = np.ones_like(radii, np.complex128)*np.nan
-    reflect_h = np.ones_like(radii)*np.nan
-    reflect_v = np.ones_like(radii)*np.nan
-
-    # S matrix for Kdp
-    sMat = np.ones_like(radii)*np.nan
-    Z11Mat = np.ones_like(radii)*np.nan
-    Z12Mat = np.ones_like(radii)*np.nan
-    Z21Mat = np.ones_like(radii)*np.nan
-    Z22Mat = np.ones_like(radii)*np.nan
-    Z33Mat = np.ones_like(radii)*np.nan
-    Z44Mat = np.ones_like(radii)*np.nan
-    S11iMat = np.ones_like(radii)*np.nan
-    S22iMat = np.ones_like(radii)*np.nan
-    for i, radius in enumerate(radii): 
-        # A quick function to save the distribution of values used in the test
-        #with open('/home/dori/table_McRadar.txt', 'a') as f:
-        #    f.write('{0:f} {1:f} {2:f} {3:f} {4:f} {5:f} {6:f}\n'.format(wl, elv,
-        #                                                                 meanAngle,
-        #                                                                 cantingStd,
-        #                                                                 radius,
-        #                                                                 rho[i],
-        #                                                                 as_ratio[i]))
-        # scattering geometry backward
-        # radius = 100.0 # just a test to force nans
-
-        scatterer.thet = 180. - scatterer.thet0
-        scatterer.phi = (180. + scatterer.phi0) % 360.
-        scatterer.radius = radius
-        scatterer.axis_ratio = 1./as_ratio[i]
-        scatterer.m = refractive.mi(wl, rho[i])
-        refIndex[i] = refractive.mi(wl, rho[i])
-
-        if safeTmatrix:
-            inputs = [str(scatterer.radius),
-                      str(scatterer.wavelength),
-                      str(scatterer.m),
-                      str(scatterer.axis_ratio),
-                      str(int(canting)),
-                      str(cantingStd),
-                      str(meanAngle),
-                      str(ndgs),
-                      str(scatterer.thet0),
-                      str(scatterer.phi0)]
-            arguments = ' '.join(inputs)
-            a = subprocess.run(['spheroidMcRadar'] + inputs, # this script should be installed by McRadar
-                               capture_output=True)
-            # print(str(a))
-            try:
-                back_hh, back_vv, sMatrix, Z11, Z12, Z21, Z22, Z33, Z44, S11i, S22i, _ = str(a.stdout).split('Results ')[-1].split()
-                back_hh = float(back_hh)
-                back_vv = float(back_vv)
-                sMatrix = float(sMatrix)
-                Z11 = float(Z11)
-                Z12 = float(Z12)
-                Z21 = float(Z21)
-                Z22 = float(Z22)
-                Z33 = float(Z33)
-                Z44 = float(Z44)
-                S11i = float(S11i)
-                S22i = float(S22i)
-            except:
-                back_hh = np.nan
-                back_vv = np.nan
-                sMatrix = np.nan
-                Z11 = np.nan
-                Z12 = np.nan
-                Z21 = np.nan
-                Z22 = np.nan
-                Z33 = np.nan
-                Z44 = np.nan
-                S11i = np.nan
-                S22i = np.nan
-            # print(back_hh, radar.radar_xsect(scatterer, True))
-            # print(back_vv, radar.radar_xsect(scatterer, False))
-            reflect_h[i] = scatterer.wavelength**4/(np.pi**5*scatterer.Kw_sqr) * back_hh # radar.radar_xsect(scatterer, True)  # Kwsqrt is not correct by default at every frequency
-            reflect_v[i] = scatterer.wavelength**4/(np.pi**5*scatterer.Kw_sqr) * back_vv # radar.radar_xsect(scatterer, False)
-
-            # scattering geometry forward
-            # scatterer.thet = scatterer.thet0
-            # scatterer.phi = (scatterer.phi0) % 360. #KDP geometry
-            # S = scatterer.get_S()
-            sMat[i] = sMatrix # (S[1,1]-S[0,0]).real
-            Z11Mat[i] = Z11
-            Z12Mat[i] = Z12
-            Z21Mat[i] = Z21
-            Z22Mat[i] = Z22
-            Z33Mat[i] = Z33
-            Z44Mat[i] = Z44
-            S11iMat[i] = S11i
-            S22iMat[i] = S22i
-            # print(sMatrix, sMat[i])
-            # print(sMatrix)
-        else:
-
-            reflect_h[i] = scatterer.wavelength**4/(np.pi**5*scatterer.Kw_sqr) * radar.radar_xsect(scatterer, True)  # Kwsqrt is not correct by default at every frequency
-            reflect_v[i] = scatterer.wavelength**4/(np.pi**5*scatterer.Kw_sqr) * radar.radar_xsect(scatterer, False)
-
-            # scattering geometry forward
-            scatterer.thet = scatterer.thet0
-            scatterer.phi = (scatterer.phi0) % 360. #KDP geometry
-            S = scatterer.get_S()
-            Z = scatterer.get_Z()
-            sMat[i] = (S[1,1]-S[0,0]).real
-            Z11Mat[i] = Z[0,0]
-            Z12Mat[i] = Z[0,1]
-            Z21Mat[i] = Z[1,0]
-            Z22Mat[i] = Z[1,1]
-            Z33Mat[i] = Z[2,2]
-            Z44Mat[i] = Z[3,3]
-            S11iMat[i] = S[0,0].imag
-            S22iMat[i] = S[1,1].imag
-            
-    kdp = 1e-3* (180.0/np.pi)*scatterer.wavelength*sMat
-
-    del scatterer # TODO: Evaluate the chance to have one Scatterer object already initiated instead of having it locally
-    
-    return reflect_h, reflect_v, refIndex, kdp, Z11Mat, Z12Mat, Z21Mat, Z22Mat, Z33Mat, Z44Mat, S11iMat, S22iMat, sMat
-
 
 def radarScat(sp, wl, K2):
 #TODO check if K2 is for ice or liquid!
@@ -257,66 +89,8 @@ def calcParticleZe(wls, elvs, mcTable,scatSet,beta,beta_std):#zeOperator
     
     #calling the function to create output columns
 
-    if scatSet['mode'] == 'Tmatrix':
-        print('Full mode Tmatrix calculation')
-        ##calculation of the reflectivity for AR < 1
-        
-        tmpTable = mcTable.where(mcTable['sPhi']<1,drop=True)
-        #particle properties
-        canting = True
-        meanAngle=0
-        cantingStd=1
-        radii_M1 = tmpTable['radii_mm'].values #[mm]
-        as_ratio_M1 = tmpTable['sPhi'].values
-        rho_M1 = tmpTable['sRho_tot_gcm'].values #[g/mm^3]
-        for wl in wls:
-            prefactor = 2*np.pi*wl**4/(np.pi**5*0.93)
-        
-            for elv in elvs:            
-                singleScat = calcScatPropOneFreq(wl, radii_M1, as_ratio_M1, 
-                                                 rho_M1, elv, canting=canting, 
-                                                 cantingStd=cantingStd, 
-                                                 meanAngle=meanAngle, ndgs=scatSet['ndgs'],
-                                                 safeTmatrix=scatSet['safeTmatrix'])
-                reflect_h, reflect_v, refInd, kdp_M1, Z11Mat, Z12Mat, Z21Mat, Z22Mat, Z33Mat, Z44Mat, S11iMat, S22iMat, sMat = singleScat
-                reflect_hv = prefactor*(Z11Mat - Z12Mat + Z21Mat - Z22Mat)
-                wlStr = '{:.2e}'.format(wl)
-                #print('reflect done')
-                #print(tmpTable.index)
-                #print(tmpTable)
-                mcTable['sZeH'].loc[elv,wl,tmpTable.index] = reflect_h
-                mcTable['sZeV'].loc[elv,wl,tmpTable.index] = reflect_v
-                mcTable['sZeHV'].loc[elv,wl,tmpTable.index] = reflect_hv
-                mcTable['sKDP'].loc[elv,wl,tmpTable.index] = kdp_M1
-
-        
-        ##calculation of the reflectivity for AR >= 1
-        tmpTable = mcTable.where(mcTable['sPhi']>=1,drop=True)
-        canting=True
-        meanAngle=90
-        cantingStd=1
-        radii_M1 = (tmpTable['radii_mm']).values #[mm]
-        as_ratio_M1 = tmpTable['sPhi'].values
-        rho_M1 = tmpTable['sRho_tot_gcm'].values #[g/mm^3]
-        for wl in wls:
-            prefactor = 2*np.pi*wl**4/(np.pi**5*0.93)
-            for elv in elvs:     
-                singleScat = calcScatPropOneFreq(wl, radii_M1, as_ratio_M1, 
-                                                 rho_M1, elv, canting=canting, 
-                                                 cantingStd=cantingStd, 
-                                                 meanAngle=meanAngle, ndgs=scatSet['ndgs'],
-                                                 safeTmatrix=scatSet['safeTmatrix'])
-                reflect_h, reflect_v, refInd, kdp_M1, Z11Mat, Z12Mat, Z21Mat, Z22Mat, Z33Mat, Z44Mat, S11iMat, S22iMat, sMat = singleScat
-                reflect_hv = prefactor*(Z11Mat - Z12Mat + Z21Mat - Z22Mat)
-                print('reflect done')
-            
-                wlStr = '{:.2e}'.format(wl)
-                mcTable['sZeH'].loc[elv,wl,tmpTable.index] = reflect_h
-                mcTable['sZeV'].loc[elv,wl,tmpTable.index] = reflect_v
-                mcTable['sZeHV'].loc[elv,wl,tmpTable.index] = reflect_hv
-                mcTable['sKDP'].loc[elv,wl,tmpTable.index] = kdp_M1
     
-    elif scatSet['mode'] == 'DDA':
+    if scatSet['mode'] == 'orientational_avg':
         """
         #-- this option uses the output of the DDA calculations. 
         We are reading in all data, then selecting the corresponding wl, elevation.
@@ -328,7 +102,7 @@ def calcParticleZe(wls, elvs, mcTable,scatSet,beta,beta_std):#zeOperator
         scatPoints={}
         # different DDA LUT for monomers and Aggregates. 
         mcTableCry = mcTable.where(mcTable['sNmono']==1,drop=True) # select only cry
-        print(mcTableCry)
+        #print(mcTableCry)
         #print(mcTableCry)
         #print(mcTableCry.dia,mcTableCry.mTot,mcTableCry.sPhi)
         #mcTablePlate = mcTableCry.where(mcTableCry['sPhi']<=1,drop=True) # select only plates
@@ -623,7 +397,7 @@ def calcParticleZe(wls, elvs, mcTable,scatSet,beta,beta_std):#zeOperator
                         else:
                             DDA_elv_agg = DDA_elv_agg[DDA_elv_agg.rimeFlag==0]
                         scatPoints={}
-                        pointsAgg = np.array(list(zip(np.log10(DDA_elv_agg.Dmax), np.log10(DDA_elv_agg.mass)))) # we need to differentiate here because for aggregates we are only selecting with mass and Dmax
+                        pointsAgg = np.array(list(zip(np.log10(DDA_elv_agg.Dmax), np.log10(DDA_elv_agg.mass)))) # we need to differentiate here because for aggregates we are only selecting with mass and Dmax xr.stack DDA_elv_agg.get('Dmax','mass'), vorher schon log10 berechnen
                         mcSnowPointsAgg = np.array(list(zip(np.log10(mcTableAgg.dia), np.log10(mcTableAgg.mTot)))) 
                         if scatSet['selmode'] == 'KNeighborsRegressor':
                             knn = neighbors.KNeighborsRegressor(scatSet['n_neighbors'],weights='distance')
@@ -693,34 +467,142 @@ def calcParticleZe(wls, elvs, mcTable,scatSet,beta,beta_std):#zeOperator
                                         'kdp':10**np.array([(np.log10(DDA_elv_agg.kdp.values+abs(np.min(DDA_elv_agg.kdp.values))+1))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-abs(np.min(DDA_elv_agg.kdp.values))-1}
                                         
                         
-                        #reflect_h,  reflect_v, reflect_hv, kdp_M1, rho_hv, cext_hh, cext_vv = radarScat(scatPoints, wl,scatSet['K2']) # get scattering properties from Matrix entries
-                        #if elv == 90:
-                        #    ax[1].plot(mcTableAgg.dia,10*np.log10(scatPoints['cbck_h']),marker='.',ls='None',label='aggs, h, '+str(wl))
-                        #    ax[1].legend()
-                            #ax[0].plot(mcTableAgg.dia,10*np.log10(scatPoints['cbck_v']),marker='.',ls='None',label='aggs, v, '+str(wl))
-                        #if elv == 30 and wl == wls[2]:
-                        #    ax[2].plot(mcTableAgg.dia,10*np.log10(scatPoints['cbck_h']/scatPoints['cbck_v']),marker='.',ls='None',label='aggs, zdr, '+str(elv))
-                        #    ax[2].legend()
-                        #    ax[3].plot(mcTableAgg.dia,scatPoints['kdp'],marker='.',ls='None',label='aggs, kdp, '+str(elv))
-                        #    ax[3].legend()
                         mcTable['sZeH'].loc[elv,wl,mcTableAgg.index] = scatPoints['cbck_h']
                         mcTable['sCextH'].loc[elv,wl,mcTableAgg.index] = scatPoints['cext_h']
                         mcTable['sCextV'].loc[elv,wl,mcTableAgg.index] = scatPoints['cext_v']
                         mcTable['sZeV'].loc[elv,wl,mcTableAgg.index] = scatPoints['cbck_v']
                         mcTable['sZeHV'].loc[elv,wl,mcTableAgg.index] = scatPoints['cbck_hv']
                         mcTable['sKDP'].loc[elv,wl,mcTableAgg.index] = scatPoints['kdp']
-                    
-                    #plt.semilogx(mcTableAgg.dia,10*np.log10(mcTable.sZeH.loc[elv,wl,mcTableAgg.index]),marker='.',ls='None')
-        #plt.legend()
-        #plt.show()                
-        #print('all calculations for all elv and wl took ', time.time() - t00,' seconds')
+    elif scatSet['mode'] == 'stochastic_aggs': #TODO: differentiate between aggregates of needles and aggregates of dendrites
+        # now we use the new stochastic aggregates generated by Axel and Fabian. Stochastic means that the aggregates do not follow a fixed mD but are generated stochastically using the aggregation model. 
+        # For this implementation we have generated a new DDA file with aggregates and random orientation (random elevation and azimuth). In order to save computation time we have decided to generate a large number of aggregates, where each aggregate only has one orientation. 
+        # in this code we need to select the aggregates according to their elevation, the azimuth is random. I would use the same method as in mode "azi_avg" because the selection of n neighbors is the same for now. In the future, if we want to include some "wobbling" effects,
+        # we can try to also include a variability in elevation  
+        scatPoints={}
+        # different DDA LUT for monomers and Aggregates. 
+        mcTableCry = mcTable.where(mcTable['sNmono']==1,drop=True)#.to_dataframe() # select only cry
+        mcTableAgg = mcTable.where(mcTable['sNmono']>1,drop=True)#.to_dataframe() # select only aggregates
+        mcTableAgg = mcTableAgg.where(~np.isnan(mcTableAgg.dia),drop=True) # remove NaN values
+        mcTableAgg = mcTableAgg.where(~np.isnan(mcTableAgg.mTot),drop=True)
+        mcTableAgg = mcTableAgg.where(~np.isnan(mcTableAgg.vel),drop=True)
+        #print(mcTableAgg)
+        #mcTableAgg = mcTableAgg.where(~np.isnan(mcTableAgg.dia))
+        #print(mcTableAgg)
         #quit()
-                
-    
-    
-    
-   
+        DDA_data_cry = xr.open_dataset(scatSet['lutPath']+'scattering_properties_all_crystals.nc')
+        DDA_data_agg = xr.open_dataset(scatSet['lutPath']+'stochastic_aggregates1.nc')
+        
+        if 'D_max' in DDA_data_agg:
+            DDA_data_agg = DDA_data_agg.rename({'D_max':'Dmax'})
+        if 'D_max' in DDA_data_cry:
+            DDA_data_cry = DDA_data_cry.rename({'D_max':'Dmax'})
+        if 'Nmonomers' in DDA_data_agg:
+            DDA_data_agg = DDA_data_agg.rename({'Nmonomers':'Nmono'})
+        DDA_data_cry = DDA_data_cry.to_dataframe()
+        DDA_data_agg = DDA_data_agg.to_dataframe()
+        for wl in wls:
+            # select correct wavelength:
+            wl_close = DDA_data_agg.iloc[(DDA_data_agg['wavelength']-wl).abs().argsort()].wavelength.values[0] # get closest wavelength to select from LUT
+            DDA_wl_agg = DDA_data_agg[DDA_data_agg.wavelength==wl_close]
             
+
+            wl_close = DDA_data_cry.iloc[(DDA_data_cry['wavelength']-wl).abs().argsort()].wavelength.values[0] # get closest wavelength to select from LUT
+            DDA_wl_cry = DDA_data_cry[DDA_data_cry.wavelength==wl_close]
+            
+            for elv in elvs:
+                #print(DDA_wl)
+                # select correct elevation:
+                el_close = DDA_wl_agg.iloc[(DDA_wl_agg['elevation']-elv).abs().argsort()].elevation.values[0] # get closest elevation to select from LUT
+                DDA_elv_agg = DDA_wl_agg[DDA_wl_agg.elevation==el_close]
+
+                el_close = DDA_wl_cry.iloc[(DDA_wl_cry['elevation']-elv).abs().argsort()].elevation.values[0] # get closest elevation to select from LUT
+                DDA_elv_cry = DDA_wl_cry[DDA_wl_cry.elevation==el_close]
+                
+                # now lets select points for crystals
+                if len(mcTableCry.mTot)>0: # only possible if we have crystals
+                    pointsCry = np.array(list(zip(np.log10(DDA_elv_cry.Dmax), np.log10(DDA_elv_cry.mass), np.log10(DDA_elv_cry.ar)))) # these are the points from the DDA file
+                    mcSnowPointsCry = np.array(list(zip(np.log10(mcTableCry.dia), np.log10(mcTableCry.mTot), np.log10(mcTableCry.sPhi)))) # we need to find the closest points in the DDA file to the points in the McSnow file
+                    # select now the points according to the defined method
+                    # Fit the KNeighborsRegressor
+                    if scatSet['selmode'] == 'KNeighborsRegressor':
+                        knn = neighbors.KNeighborsRegressor(scatSet['n_neighbors'],weights='distance')
+                        # in order to apply the log, all values need to be positive, so we are going to shift all values by the minimum value (except for Z11 because this is always positive)
+                        scatPoints = {'Z11':10**knn.fit(pointsCry, np.log10(DDA_elv_cry.Z11.values)).predict(mcSnowPointsCry),
+                                        'Z12':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z12.values+2*abs(np.min(DDA_elv_cry.Z12.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.Z12.values)),
+                                        'Z21':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z21.values+2*abs(np.min(DDA_elv_cry.Z21.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.Z21.values)),
+                                        'Z22':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z22.values+2*abs(np.min(DDA_elv_cry.Z22.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.Z22.values)),
+                                        
+                                        'S11i':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S11i.values+2*abs(np.min(DDA_elv_cry.S11i.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.S11i.values)),
+                                        'S22i':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S22i.values+2*abs(np.min(DDA_elv_cry.S22i.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.S22i.values)),
+                                        'S11r':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S11r.values+2*abs(np.min(DDA_elv_cry.S11r.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.S11r.values)),
+                                        'S22r':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S22r.values+2*abs(np.min(DDA_elv_cry.S22r.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.S22r.values))}
+                    
+                    # calculate scattering properties from Matrix entries                
+                    reflect_h,  reflect_v, reflect_hv, kdp_M1, rho_hv, cext_hh, cext_vv = radarScat(scatPoints, wl,scatSet['K2']) # calculate scattering properties from Matrix entries
+                    mcTable['sZeH'].loc[elv,wl,mcTableCry.index] = reflect_h#points.ZeH
+                    mcTable['sZeV'].loc[elv,wl,mcTableCry.index] = reflect_v#points.ZeV
+                    mcTable['sZeHV'].loc[elv,wl,mcTableCry.index] = reflect_hv
+                    mcTable['sKDP'].loc[elv,wl,mcTableCry.index] = kdp_M1#points.KDP
+                    mcTable['sCextH'].loc[elv,wl,mcTableCry.index] = cext_hh
+                    mcTable['sCextV'].loc[elv,wl,mcTableCry.index] = cext_vv
+
+                if len(mcTableAgg.mTot)>0: # only possible if we have crystals
+                    
+                    # select now the points according to the defined method
+                    # Fit the KNeighborsRegressor
+                    if scatSet['selmode'] == 'KNeighborsRegressor':
+                        pointsAgg = np.array(list(zip(np.log10(DDA_elv_agg.Dmax), np.log10(DDA_elv_agg.mass)))) # these are the points from the DDA file
+                        mcSnowPointsAgg = np.array(list(zip(np.log10(mcTableAgg.dia), np.log10(mcTableAgg.mTot)))) # we need to find the closest points in the DDA file to the points in the McSnow file
+                        knn = neighbors.KNeighborsRegressor(scatSet['n_neighbors'],weights='distance')
+                        # in order to apply the log, all values need to be positive, so we are going to shift all values by the minimum value (except for Z11 because this is always positive)
+                        scatPoints = {'Z11':10**knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z11.values)).predict(mcSnowPointsAgg),
+                                        'Z12':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z12.values+2*abs(np.min(DDA_elv_agg.Z12.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.Z12.values)),
+                                        'Z21':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z21.values+2*abs(np.min(DDA_elv_agg.Z21.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.Z21.values)),
+                                        'Z22':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z22.values+2*abs(np.min(DDA_elv_agg.Z22.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.Z22.values)),
+                                        
+                                        'S11i':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S1i.values+2*abs(np.min(DDA_elv_agg.S1i.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.S1i.values)),
+                                        'S22i':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S2i.values+2*abs(np.min(DDA_elv_agg.S2i.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.S2i.values)),
+                                        'S11r':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S1r.values+2*abs(np.min(DDA_elv_agg.S1r.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.S1r.values)),
+                                        'S22r':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S2r.values+2*abs(np.min(DDA_elv_agg.S2r.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.S2r.values))}
+                    
+                    # calculate scattering properties from Matrix entries                
+                    #plt.semilogx(mcTableAgg.mTot,10*np.log10(reflect_h),marker='.',ls='None')
+                    #plt.semilogx(mcTableAgg.mTot,10*np.log10(reflect_v),marker='.',ls='None')
+                    #plt.show()
+                    #TODO do I need to make everything in mm2? Or is that already done?
+                    #plt.savefig('test.png')
+                    #quit()
+                    #print(reflect_h)
+                    #print(mcTable)
+                    #print(mcTableAgg.index)
+                    if scatSet['selmode'] == 'stochastic_sampling':
+                        print(mcTableAgg.dia, mcTableAgg.sMult)
+
+                        quit()
+                        #knn = neighbors.KNeighborsRegressor(scatSet['n_neighbors'],weights='distance')
+                        # in order to apply the log, all values need to be positive, so we are going to shift all values by the minimum value (except for Z11 because this is always positive)
+                        #scatPoints = {'Z11':10**knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z11.values)).predict(mcSnowPointsAgg),
+                        #                'Z12':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z12.values+2*abs(np.min(DDA_elv_agg.Z12.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.Z12.values)),
+                        #                'Z21':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z21.values+2*abs(np.min(DDA_elv_agg.Z21.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.Z21.values)),
+                        #                'Z22':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z22.values+2*abs(np.min(DDA_elv_agg.Z22.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.Z22.values)),
+                                        
+                        #                'S11i':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S1i.values+2*abs(np.min(DDA_elv_agg.S1i.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.S1i.values)),
+                        #                'S22i':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S2i.values+2*abs(np.min(DDA_elv_agg.S2i.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.S2i.values)),
+                        #                'S11r':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S1r.values+2*abs(np.min(DDA_elv_agg.S1r.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.S1r.values)),
+                        #                'S22r':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S2r.values+2*abs(np.min(DDA_elv_agg.S2r.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.S2r.values))}
+                    
+                    # calculate scattering properties from Matrix entries                
+
+
+                    reflect_h,  reflect_v, reflect_hv, kdp_M1, rho_hv, cext_hh, cext_vv = radarScat(scatPoints, wl,scatSet['K2']) # calculate scattering properties from Matrix entries
+                    mcTable['sZeH'].loc[elv,wl,mcTableAgg.index] = reflect_h#points.ZeH
+                    mcTable['sZeV'].loc[elv,wl,mcTableAgg.index] = reflect_v#points.ZeV
+                    mcTable['sZeHV'].loc[elv,wl,mcTableAgg.index] = reflect_hv
+                    mcTable['sKDP'].loc[elv,wl,mcTableAgg.index] = kdp_M1#points.KDP
+                    mcTable['sCextH'].loc[elv,wl,mcTableAgg.index] = cext_hh
+                    mcTable['sCextV'].loc[elv,wl,mcTableAgg.index] = cext_vv
+
+
 
     return mcTable
 

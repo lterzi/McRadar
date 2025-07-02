@@ -93,8 +93,8 @@ def fullRadarParallel(dicSettings, mcTable):
 	#	if result:
 	#		specXR = xr.merge([specXR,result])
 	result =  pool.starmap(getRadarParParallel,args)
+	print('done with calcs, now need to merge')
 	result = [x for x in result if x is not None]
-	
 	#print(result)
 	specXR = xr.merge(result)
 	
@@ -147,8 +147,10 @@ def fullRadar(dicSettings, mcTable):
 						        		dicSettings['eps_diss'], dicSettings['uwind'],dicSettings['time_int'], dicSettings['theta']/2./180.*np.pi,
 						        		k_theta,k_phi,k_r, dicSettings['tau'],
 						        		scatSet=dicSettings['scatSet'])
-
-
+			#plt.plot(tmpSpecXR.vel,10*np.log10(tmpSpecXR.spec_H.sel(elevation=90,wavelength=3.189,range=(heightEdge1+heightEdge0)/2,method='nearest')))
+			#plt.show()
+			#print(tmpSpecXR)
+#			quit()
 			#volume normalization
 			#for var in tmpSpecXR:
 		#		print(var)
@@ -174,11 +176,11 @@ def fullRadar(dicSettings, mcTable):
 				#quit()
 				
 		
-			if (dicSettings['scatSet']['mode'] == 'full') or (dicSettings['scatSet']['mode'] == 'table') or (dicSettings['scatSet']['mode'] == 'wisdom') or (dicSettings['scatSet']['mode'] == 'DDA'):
+			#if (dicSettings['scatSet']['mode'] == 'full') or (dicSettings['scatSet']['mode'] == 'table') or (dicSettings['scatSet']['mode'] == 'wisdom') or (dicSettings['scatSet']['mode'] == 'DDA'):
 			#calculating the integrated kdp
-				tmpKdpXR =  getIntKdp(mcTableTmp,(heightEdge1+heightEdge0)/2)
-				specXR = xr.merge([specXR, tmpKdpXR/vol])
-				#print(specXR)
+			tmpKdpXR =  getIntKdp(mcTableTmp,(heightEdge1+heightEdge0)/2)
+			specXR = xr.merge([specXR, tmpKdpXR/vol])
+			#print(specXR)
 					
 		
 		else:
