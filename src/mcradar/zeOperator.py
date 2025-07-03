@@ -304,6 +304,9 @@ def calcParticleZe(wls, elvs, mcTable,scatSet,beta,beta_std):#zeOperator
                         # Fit the KNeighborsRegressor
                         if scatSet['selmode'] == 'KNeighborsRegressor':
                             knn = neighbors.KNeighborsRegressor(scatSet['n_neighbors'],weights='distance')
+                            #print(max(np.log10(DDA_elv_cry.c_bck_hv.values+2*abs(np.min(DDA_elv_cry.c_bck_hv.values)))))
+                            #quit()
+                            #print(np.isfinite(DDA_elv_cry.c_bck_hv.values+2*abs(np.min(DDA_elv_cry.c_bck_hv.values))).all())
                             # in order to apply the log, all values need to be positive, so we are going to shift all values by the minimum value (except for Z11 because this is always positive)
                             scatPoints = {'cbck_h':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.c_bck_h.values)).predict(mcSnowPointsCry)),#'Z11':10**knn.fit(pointsCry, np.log10(DDA_elv_cry.Z11.values)).predict(mcSnowPointsCry),
                                         # 'Z12':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z12.values+abs(np.min(DDA_elv_cry.Z12.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Z12.values))-1,
@@ -316,9 +319,9 @@ def calcParticleZe(wls, elvs, mcTable,scatSet,beta,beta_std):#zeOperator
                                             
                                             'cbck_v':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.c_bck_v.values)).predict(mcSnowPointsCry)),
                                             'cbck_hv':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.c_bck_hv.values+abs(np.min(DDA_elv_cry.c_bck_hv.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.c_bck_hv.values))-1,
-                                            'cext_h':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.cext_hh.values+abs(np.min(DDA_elv_cry.cext_hh.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.cext_hh.values))-1,
-                                            'cext_v':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.cext_vv.values+abs(np.min(DDA_elv_cry.cext_vv.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.cext_vv.values))-1,
-                                            'kdp':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.kdp.values+abs(np.min(DDA_elv_cry.kdp.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.kdp.values))-1,
+                                            'cext_h':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.cext_hh.values+2*abs(np.min(DDA_elv_cry.cext_hh.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.cext_hh.values)),
+                                            'cext_v':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.cext_vv.values+2*abs(np.min(DDA_elv_cry.cext_vv.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.cext_vv.values)),
+                                            'kdp':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.kdp.values+2*abs(np.min(DDA_elv_cry.kdp.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.kdp.values)),
                                             }
                         
                         elif scatSet['selmode'] == 'radius':
