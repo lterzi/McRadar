@@ -6,16 +6,12 @@ McRadar is a tool used for forward simulating Particle microphysical properties 
 First clone the project from github: 
 
 ```
-{
 git clone https://github.com/lterzi/McRadar.git
-}
 ```
 Then navigate into the McRadar folder and install with 
 
 ```
-{
 pip install .
-}
 ```
 
 
