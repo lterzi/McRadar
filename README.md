@@ -2,6 +2,22 @@
 ## project description:
 McRadar is a tool used for forward simulating Particle microphysical properties into radar space. It was mainly developed for forward simulating McSnow output (hence the Mc in McRadar). McRadar uses look-up tables of scattering properties calculated with the discrete dipole approximation. These LUTs are stored in the subfolder LUT. It will calculate the Doppler spectra at horizontal and vertical polarization (Ze_hh, Ze_vv and Ze_hv) as well as KDP based on the given particle microphysical properties (for ice crystals Dmax, mass, aspect ratio and fall velocity of the particles are required, for aggregates mass, Dmax and fall velocity). In a next step, the Doppler spectrum can be convoluted with noise and turbulence, and attenuation can be added. 
 
+## Installation: 
+First clone the project from github: 
+
+```
+{
+git clone https://github.com/lterzi/McRadar.git
+}
+```
+Then navigate into the McRadar folder and install with 
+
+```
+{
+pip install .
+}
+```
+
 
 ## McRadar modes
 McRadar has two modes: forward simulating McSnow simulations and forward simulating a given particle size distribution. These two modes are shown in examples/forward_simulate_McSnow_casestudy.py and examples/forward_simulate_PSD.py
