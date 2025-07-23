@@ -19,8 +19,7 @@ def loadSettings(PSD=False,dataPath=None,atmoFile=None, elv=90, nfft=512,
                  heightRes=50, gridBaseArea=1,
                  attenuation=False,onlyIce=True,
                  beta=0,beta_std=0,
-                 scatSet={'mode':'DDA', 'selmode':'KNeighborsRegressor', 'n_neighbors':5, 'radius':1e-10,
-                          'safeTmatrix':False,'K2':0.93,'orientational_avg':False}):
+                 scatSet={'mode':'DDA', 'selmode':'KNeighborsRegressor', 'n_neighbors':5, 'radius':1e-10,'K2':0.93}):
     
    # TODO make eps_diss, wind and shear dependent on height (so an array with length of height). One idea: read in a file with height and eps_diss and then it can select the according eps_diss in full_radar that corresponds to the height. Or: already have eps_diss specified for all heights and just loop through it in fullRadar
     """
@@ -57,51 +56,46 @@ def loadSettings(PSD=False,dataPath=None,atmoFile=None, elv=90, nfft=512,
     beta: wobbling angle of particles, default: 0°
     beta_std: standard deviation of the wobbling angle of particles, default: 0°. For the wobbling of particles, a normal distribution with mean beta and std beta_std is used.
     scatSet: dictionary that defines the settings for the scattering calculations
-    scatSet['mode']: string that defines the scattering mode. Valid values are
-                        - Tmatrix -> pytmatrix calculations for each superparticle
-                        - DDA -> this mode uses DDA table. Possible frequencies: 9.6GHz, 35.5GHz, 94.0GHz. Selection is based on mass, ar and size. 
-                        		 Columnar or plate-like scattering table will be chosen depending on the aspect ratio of the particles. You need to specify the path to the LUT.  
+    scatSet['mode']: string that defines the mode of scattering properties you want to use. Valid values are
+                        - azimuthal_random_orientation -> this assumes that the particles orientation is random in azimuthal direction. For different wobbling angles beta, the particle was then averaged over the azimuthal angle.
+                        - fixed_orientation -> this assumes that the particles orientation is fixed in azimuthal direction.
     scatSet['K2']: dielectric constant of the particles, default: 0.93
     scatSet['selmode']: string that defines the selection mode for the DDA database. Valid entries are 
                         - KNeighborsRegressor: this mode uses the KNeighborsRegressor from sklearn. The n_neighbors closest neighbors in Dmax, aspect ratio and mass are selected 
                                                 and the corresponding scattering properties are averaged based on the inverse distance of the neighbors.  
                         - NearestNeighbors: the n_neighbors closest neighbors in Dmax, aspect ratio and mass are selected and the scattering properties of these points are averaged.
                         - radius: this mode uses the radius_neighbors from sklearn. All neighbors (Dmax, aspect ratio, mass) within the predefined radius are selected and the scattering properties are averaged.
-    scatSet['n_neighbors']: number of neighbors to use for the KNeighborsRegressor
+    scatSet['n_neighbors']: number of neighbors to use for selmode 'KNeighborsRegressor' and 'NearestNeighbors'. Default is 5
     scatSet['radius']: radius in which the nearest neighbours are selected when scatSet['selmode'] is set to radius.
     scatSet['lutPath']: path to where the DDA calculations are stored. This is only needed when scatSet['mode'] is set to DDA.
-    scatSet['ndgs']: number of division points used to integrate over the particle surface (default = 30) when using Tmatrix as scattering mode
     Returns
     -------
     dicSettings: dictionary with all parameters
     for starting the caculations
     """
     if 'mode' not in scatSet.keys():
-      scatSet['mode'] = 'DDA'
-    if 'safeTmatrix' not in scatSet.keys():
-      scatSet['safeTmatrix'] = False
+      scatSet['mode'] = 'fixed_orientation'
     if 'K2' not in scatSet.keys():
         scatSet['K2'] = 0.93
-    if 'ndgs' not in scatSet.keys():
-        scatSet['ndgs'] = 30
     if 'n_neighbors' not in scatSet.keys():
         scatSet['n_neighbors'] = 5
     if 'radius' not in scatSet.keys():
         scatSet['radius'] = 1e-10
     if 'selmode' not in scatSet.keys():
         scatSet['selmode'] = 'KNeighborsRegressor'
-    if 'orientational_avg' not in scatSet.keys():
-        scatSet['orientational_avg'] = False
-
+    
+    print('you selected {} as scattering mode. The scattering properties are selected from a LUT by choosing the closest neighbors in Dmax, aspect ratio and mass using the method {}'.format(scatSet['mode'],scatSet['selmode']))
+    
+    if 'lutPath' not in scatSet.keys():
+        raise FileNotFoundError('with this scattering mode ', scatSet['mode'], 'a valid path to the scattering LUT is required.')
+        
+    elif not os.path.exists(scatSet['lutPath']):    
+        raise FileNotFoundError(scatSet['lutPath'], 'is not valid, check your settings')
     if dataPath != None:
         
         del_v = (maxVel-minVel) / nfft
         dicSettings = {'dataPath':dataPath,
                        'elv':elv,
-                       #'nfft':nfft,
-                       #'maxVel':maxVel,
-                       #'minVel':minVel,
-                       #'velRes':(maxVel - minVel)/nfft,
                        'freq':freq,
                        'wl':(constants.c / freq) * 1e3, #[mm]
                        'maxHeight':maxHeight,
@@ -113,7 +107,6 @@ def loadSettings(PSD=False,dataPath=None,atmoFile=None, elv=90, nfft=512,
                        'convolute':convolute,
                        'attenuation':attenuation,
                        'nave':nave,
-                       #'noise_pow':(10**(noise_pow/10))*(nfft*del_v),
                        'eps_diss':eps_diss,
                        'theta':theta, 
                        'time_int':time_int,
@@ -230,27 +223,6 @@ def loadSettings(PSD=False,dataPath=None,atmoFile=None, elv=90, nfft=512,
             else:
                 raise FileNotFoundError(['since you want to do the attenuation correction you need to give an atmoFile as input.'])
     
-    if scatSet['mode'] == 'DDA':
-        print(scatSet) 
-        print(scatSet['selmode'])
-        print('you selected DDA as scattering mode. The scattering properties are selected from a LUT by choosing the closest neighbors in Dmax, aspect ratio and mass using the method {}'.format(scatSet['selmode']))
-        
-        if 'lutPath' not in scatSet.keys():
-            raise FileNotFoundError('with this scattering mode ', scatSet['mode'], 'a valid path to the scattering LUT is required.')
-            
-        elif not os.path.exists(scatSet['lutPath']):    
-            raise FileNotFoundError(scatSet['lutPath'], 'is not valid, check your settings')
-            
-        
-        #if float(dicSettings['freq']) != float(94e9):
-        #    msg = ('\n').join(['with this scattering mode ', scatSet['mode'],
-        #                       'only freq=94.00GHz is possible!',
-        #                       'check your settings'])
-        #    dicSettings = None
-        
-        
-    
-
     return dicSettings
                  
 
