@@ -1,0 +1,6 @@
+xarray
+pandas
+numpy
+scipy
+netCDF4
+scikit-learn
