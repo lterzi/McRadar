@@ -11,6 +11,7 @@ import time
 import multiprocessing
 from multiprocessing import Process, Queue
 import sys
+from scipy.spatial import cKDTree 
 #if not sys.warnoptions: # bad form, would not recommend!
 #	import warnings
 #    warnings.simplefilter("ignore")
@@ -18,37 +19,55 @@ import warnings
 warnings.filterwarnings('ignore')
 debugging=True
 reduce_ncores = True
-def getRadarParParallel(heightEdge0,mcTable,dicSettings):#heightRes,wl,elv,ndgsVal,scatSet,velBins,velCenterBin,convolute,nave,noise_pow,eps_diss,uwind,time_int,theta,tau):
+
+def gen_ckdtree(aggdb, search_radii):
+    scaling = np.array([1.0 / search_radii[dim] for dim in search_radii.keys()]) # scale euclidean space for search
+    points = np.stack([aggdb[dim] for dim in search_radii.keys()], axis=-1) # sample points out of aggdb
+    scaled_points = points * scaling
+    tree = cKDTree(scaled_points)
+    return tree, scaling 
+
+def getRadarParParallel(heightEdge0,mcTable,mcTableAgg,mcTableCry,dicSettings,tree,scaling,DDA_data_agg):#heightRes,wl,elv,ndgsVal,scatSet,velBins,velCenterBin,convolute,nave,noise_pow,eps_diss,uwind,time_int,theta,tau):
 	vol = dicSettings['gridBaseArea'] * dicSettings['heightRes']
 	heightEdge1 = heightEdge0 + dicSettings['heightRes']
 
 	print('Range: from {0} to {1}'.format(heightEdge0, heightEdge1))
+	mcTableAggTmp = mcTableAgg.where((mcTableAgg['sHeight']>heightEdge0) &
+			 					(mcTableAgg['sHeight']<=heightEdge1),drop=True)
+	mcTableCryTmp = mcTableCry.where((mcTableCry['sHeight']>heightEdge0) &
+			 					(mcTableCry['sHeight']<=heightEdge1),drop=True)
 	mcTableTmp = mcTable.where((mcTable['sHeight']>heightEdge0) &
 			 					(mcTable['sHeight']<=heightEdge1),drop=True)
-	
 	if mcTableTmp.vel.any():
-		mcTableTmp = calcParticleZe(dicSettings['wl'], dicSettings['elv'], mcTableTmp, dicSettings['scatSet'],dicSettings['beta'],dicSettings['beta_std'])#,height=(heightEdge1+heightEdge0)/2)
+		#- get the scattering properties for each particle, we have separate tables for aggregates and crystals
+		mcTableTmp = calcParticleZe(dicSettings['wl'], dicSettings['elv'], mcTableTmp,mcTableAggTmp,mcTableCryTmp, dicSettings['scatSet'],dicSettings['beta'],dicSettings['beta_std'],tree, scaling,DDA_data_agg)#,height=(heightEdge1+heightEdge0)/2)
+		#- get the spectra, there is the possibility to add shear, but I have not implemented it yet
 		k_theta, k_phi, k_r = 0,0,0
 		tmpSpecXR = getMultFrecSpec(dicSettings['wl'], dicSettings['elv'],mcTableTmp, dicSettings['velBins'],
 					        		dicSettings['velCenterBin'], (heightEdge1+heightEdge0)/2,dicSettings['convolute'],dicSettings['nave'],dicSettings['noise_pow'],
 					        		dicSettings['eps_diss'], dicSettings['uwind'],dicSettings['time_int'], dicSettings['theta']/2./180.*np.pi,
 					        		k_theta,k_phi,k_r, dicSettings['tau'],
 					        		scatSet=dicSettings['scatSet'])
-
-
-		
 		tmpSpecXR = tmpSpecXR/vol
-	
-		#if (dicSettings['scatSet']['mode'] == 'full') or (dicSettings['scatSet']['mode'] == 'table') or (dicSettings['scatSet']['mode'] == 'wisdom') or (dicSettings['scatSet']['mode'] == 'DDA'):
-		#calculating the integrated kdp
 		tmpKdpXR =  getIntKdp(mcTableTmp,(heightEdge1+heightEdge0)/2)
 		tmpSpecXR = xr.merge([tmpSpecXR, tmpKdpXR/vol])
-			#print(specXR)
-		#print(tmpSpecXR)
-		#plt.plot(tmpSpecXR.vel,tmpSpecXR.sel(elevation=90,wavelength=31.23,range=tmpSpecXR.range[0],method='nearest').spec_H)
-		#plt.savefig('/project/meteo/work/L.Terzi/McSnow_habit/test_McRadar_height{}.png'.format(tmpSpecXR.range.values))
-		#plt.close()
-		#quit()		
+		
+		if dicSettings['attenuation'] == True:
+			
+			tmpSpecXR['att_atm_ice_HH'] = 2*tmpSpecXR.att_ice_HH.cumsum(dim='range') + 2*tmpSpecXR.att_atmo.cumsum(dim='range')
+			tmpSpecXR['att_atm_ice_VV'] = 2*tmpSpecXR.att_ice_VV.cumsum(dim='range') + 2*tmpSpecXR.att_atmo.cumsum(dim='range')
+			tmpSpecXR.att_atm_ice_HH.attrs['long_name'] = '2 way attenuation at HH polarization'
+			tmpSpecXR.att_atm_ice_HH.attrs['unit'] = 'dB'
+			tmpSpecXR.att_atm_ice_HH.attrs['comment'] = '2 way attenuation for ice particles and atmospheric gases (N2,O2,H2O). The spectra are divided my this, so to get unattenuated spectra, multiply with this (in linear units)'
+			
+			tmpSpecXR.att_atm_ice_HH.attrs['long_name'] = '2 way attenuation at VV polarization'
+			tmpSpecXR.att_atm_ice_HH.attrs['unit'] = 'dB'
+			tmpSpecXR.att_atm_ice_HH.attrs['comment'] = '2 way attenuation for ice particles and atmospheric gases (N2,O2,H2O). The spectra are divided my this, so to get unattenuated spectra, multiply with this (in linear units)'
+			
+			tmpSpecXR['spec_H_att'] = tmpSpecXR.spec_H/(10**(tmpSpecXR.att_atm_ice_HH/10))
+			tmpSpecXR['spec_V'] = tmpSpecXR.spec_V/(10**(tmpSpecXR.att_atm_ice_VV/10))
+			tmpSpecXR['spec_HV'] = tmpSpecXR.spec_HV/(10**(tmpSpecXR.att_atm_ice_HH/10))
+		
 		return tmpSpecXR
 	else:
 		print('empty dataset at this height range')
@@ -75,27 +94,32 @@ def fullRadarParallel(dicSettings, mcTable):
 	#specXR_turb = xr.Dataset()
 	
 	mcTable = creatRadarCols(mcTable, dicSettings)
+	mcTableCry = mcTable.where(mcTable['sNmono']==1,drop=True) # select only cry, only calculate that once!
+	mcTableAgg = mcTable.where(mcTable['sNmono']>1,drop=True) # select only aggregates
+
+	DDA_data_agg = xr.open_dataset(dicSettings['scatSet']['lutPath']+'stochastic_aggregates.nc')
+	DDA_data_agg['logmass'] = np.log10(DDA_data_agg.mass)
+	DDA_data_agg['logDmax'] = np.log10(DDA_data_agg.Dmax)
+	#print(aggdb)
+	
+	search_radii = dict(
+						logmass=abs(np.log10(1) - np.log10(1.02)), # 2 %
+						logDmax=abs(np.log10(1) - np.log10(1.05)), # 5 %
+						elevation = 5,
+						wavelength = 0.1,
+						)
+	tree, scaling = gen_ckdtree(DDA_data_agg, search_radii)
+
 	t0 = time.time()
 	n_cores = 4#multiprocessing.cpu_count()
-	#if reduce_ncores:
-	#	if n_cores > 1:
-	#		n_cores = n_cores - 1 # we have the main function running on one core and our institute does not allow to use all cores
 	print(n_cores)
 	pool = multiprocessing.Pool(n_cores)
 	
-	args = [(h, mcTable, dicSettings) for h in dicSettings['heightRange']]
+	args = [(h, mcTable,mcTableAgg,mcTableCry, dicSettings,tree,scaling,DDA_data_agg) for h in dicSettings['heightRange']]
 	
-	#for result in pool.starmap(getRadarParParallel,args):
-	#for h in dicSettings['heightRange']:
-	#	result = getRadarParParallel(h,mcTable,dicSettings)
-		#print(result)
-		#quit()
-	#	if result:
-	#		specXR = xr.merge([specXR,result])
 	result =  pool.starmap(getRadarParParallel,args)
-	print('done with calcs, now need to merge')
 	result = [x for x in result if x is not None]
-	#print(result)
+	
 	specXR = xr.merge(result)
 	
 	if debugging:
@@ -126,6 +150,20 @@ def fullRadar(dicSettings, mcTable):
 	mcTable = creatRadarCols(mcTable, dicSettings)
 	t0 = time.time()
 	att_atm0 = 0.; att_ice_HH0=0.; att_ice_VV0=0.
+	mcTableCry = mcTable.where(mcTable['sNmono']==1,drop=True) # select only cry, only calculate that once!
+	mcTableAgg = mcTable.where(mcTable['sNmono']>1,drop=True) # select only aggregates
+	DDA_data_agg = xr.open_dataset(dicSettings['scatSet']['lutPath']+'stochastic_aggregates.nc')
+	DDA_data_agg['logmass'] = np.log10(DDA_data_agg.mass)
+	DDA_data_agg['logDmax'] = np.log10(DDA_data_agg.Dmax)
+	#print(aggdb)
+	
+	search_radii = dict(
+						logmass=abs(np.log10(1) - np.log10(1.05)), # 2 %
+						logDmax=abs(np.log10(1) - np.log10(1.05)), # 5 %
+						elevation = 5,
+						wavelength = 0.1,
+						)
+	tree, scaling = gen_ckdtree(DDA_data_agg, search_radii)
 	for i, heightEdge0 in enumerate(dicSettings['heightRange']):
 
 		heightEdge1 = heightEdge0 + dicSettings['heightRes']
@@ -133,85 +171,53 @@ def fullRadar(dicSettings, mcTable):
 		print('Range: from {0} to {1}'.format(heightEdge0, heightEdge1))
 		mcTableTmp = mcTable.where((mcTable['sHeight']>heightEdge0) &
 				 					(mcTable['sHeight']<=heightEdge1),drop=True)
-		
+		mcTableAggTmp = mcTableAgg.where((mcTableAgg['sHeight']>heightEdge0) &
+			 					(mcTableAgg['sHeight']<=heightEdge1),drop=True)
+		mcTableCryTmp = mcTableCry.where((mcTableCry['sHeight']>heightEdge0) &
+			 					(mcTableCry['sHeight']<=heightEdge1),drop=True)
+		print(mcTableCryTmp)
 		if mcTableTmp.vel.any():
-			mcTableTmp = calcParticleZe(dicSettings['wl'], dicSettings['elv'], mcTableTmp, dicSettings['scatSet'],dicSettings['beta'],dicSettings['beta_std'])#,height=(heightEdge1+heightEdge0)/2)
-			#quit()
-			if (heightEdge0 >= dicSettings['shear_height0']) and (heightEdge1 <= dicSettings['shear_height1']): # only if we are within the shear zone, have shear! TODO make it possible to have profile of wind shear read in!!
-				k_theta,k_phi,k_r = dicSettings['k_theta'], dicSettings['k_phi'], dicSettings['k_r']
-				
-			else:
-				k_theta, k_phi, k_r = 0,0,0
+			mcTableTmp = calcParticleZe(dicSettings['wl'], dicSettings['elv'], mcTableTmp,mcTableAggTmp,mcTableCryTmp, dicSettings['scatSet'],dicSettings['beta'],dicSettings['beta_std'],tree, scaling,DDA_data_agg)#,height=(heightEdge1+heightEdge0)/2)
+			#- get the spectra, there is the possibility to add shear, but I have not implemented it yet
+			k_theta, k_phi, k_r = 0,0,0
 			tmpSpecXR = getMultFrecSpec(dicSettings['wl'], dicSettings['elv'],mcTableTmp, dicSettings['velBins'],
-						        		dicSettings['velCenterBin'], (heightEdge1+heightEdge0)/2,dicSettings['convolute'],dicSettings['nave'],dicSettings['noise_pow'],
-						        		dicSettings['eps_diss'], dicSettings['uwind'],dicSettings['time_int'], dicSettings['theta']/2./180.*np.pi,
-						        		k_theta,k_phi,k_r, dicSettings['tau'],
-						        		scatSet=dicSettings['scatSet'])
-			#plt.plot(tmpSpecXR.vel,10*np.log10(tmpSpecXR.spec_H.sel(elevation=90,wavelength=3.189,range=(heightEdge1+heightEdge0)/2,method='nearest')))
-			#plt.show()
-			#print(tmpSpecXR)
-#			quit()
-			#volume normalization
-			#for var in tmpSpecXR:
-		#		print(var)
-		#		if 'Broad' not in var:
-		#			tmpSpecXR[var] = tmpSpecXR[var]/vol
+										dicSettings['velCenterBin'], (heightEdge1+heightEdge0)/2,dicSettings['convolute'],dicSettings['nave'],dicSettings['noise_pow'],
+										dicSettings['eps_diss'], dicSettings['uwind'],dicSettings['time_int'], dicSettings['theta']/2./180.*np.pi,
+										k_theta,k_phi,k_r, dicSettings['tau'])
 			tmpSpecXR = tmpSpecXR/vol
-			#plt.plot(tmpSpecXR.vel,10*np.log10(tmpSpecXR.spec_H.sel(elevation=90,wavelength=3.189,range=(heightEdge1+heightEdge0)/2,method='nearest')))
-			#print(10*np.log10(tmpSpecXR.spec_H.sum(dim='vel')/tmpSpecXR.spec_V.sum(dim='vel')))
-			#plt.show()
+			plt.plot(tmpSpecXR.vel,10*np.log10(tmpSpecXR.spec_H.sel(wavelength=3,elevation=90,range=(heightEdge1+heightEdge0)/2,method='nearest')))#range=(heightEdge1+heightEdge0)/2))
+			#plt.savefig('test_spec.png')
+			#plt.close()
+			plt.show()
 			
-
-			#print(tmpSpecXR)
-			##quit()
-			specXR = xr.merge([specXR, tmpSpecXR])
-			
-			if dicSettings['attenuation'] == True:
-				tmpAtt = get_attenuation(mcTableTmp, dicSettings['wl'], dicSettings['elv'],
-																			dicSettings['temp'].sel(range=(heightEdge1+heightEdge0)/2), dicSettings['relHum'].sel(range=(heightEdge1+heightEdge0)/2), dicSettings['press'].sel(range=(heightEdge1+heightEdge0)/2),
-																			dicSettings['scatSet']['mode'],	vol,(heightEdge1+heightEdge0)/2,dicSettings['heightRes'])#,att_atm0,att_ice_HH0,att_ice_VV0) 			
-				
-				specXR = xr.merge([specXR,tmpAtt])
-				#print(specXR)
-				#quit()
-				
-		
-			#if (dicSettings['scatSet']['mode'] == 'full') or (dicSettings['scatSet']['mode'] == 'table') or (dicSettings['scatSet']['mode'] == 'wisdom') or (dicSettings['scatSet']['mode'] == 'DDA'):
-			#calculating the integrated kdp
+			#quit()
 			tmpKdpXR =  getIntKdp(mcTableTmp,(heightEdge1+heightEdge0)/2)
-			specXR = xr.merge([specXR, tmpKdpXR/vol])
+			specXR = xr.merge([specXR,tmpSpecXR, tmpKdpXR/vol])
 			#print(specXR)
-					
-		
-		else:
-			print('empty dataset at this height range')
-	
-	if dicSettings['attenuation'] == True:
-		#print(2*np.cumsum(specXR.att_atmo.cumsum(dim='range')))
-		#plt.plot(specXR.att_atmo.sel(wavelength=specXR.wavelength[0],elevation=90),specXR.range,label='atmo')
-		#plt.plot(specXR.att_ice_HH.sel(wavelength=specXR.wavelength[0],elevation=90),specXR.range,label='ice')
-		#plt.savefig('test_att_atmo_dh.png')
-		#plt.show()
-		#quit()
-		specXR['att_atm_ice_HH'] = 2*specXR.att_ice_HH.cumsum(dim='range') + 2*specXR.att_atmo.cumsum(dim='range')
-		specXR['att_atm_ice_VV'] = 2*specXR.att_ice_VV.cumsum(dim='range') + 2*specXR.att_atmo.cumsum(dim='range')
-		specXR.att_atm_ice_HH.attrs['long_name'] = '2 way attenuation at HH polarization'
-		specXR.att_atm_ice_HH.attrs['unit'] = 'dB'
-		specXR.att_atm_ice_HH.attrs['comment'] = '2 way attenuation for ice particles and atmospheric gases (N2,O2,H2O). The spectra are divided my this, so to get unattenuated spectra, multiply with this (in linear units)'
-		
-		specXR.att_atm_ice_HH.attrs['long_name'] = '2 way attenuation at VV polarization'
-		specXR.att_atm_ice_HH.attrs['unit'] = 'dB'
-		specXR.att_atm_ice_HH.attrs['comment'] = '2 way attenuation for ice particles and atmospheric gases (N2,O2,H2O). The spectra are divided my this, so to get unattenuated spectra, multiply with this (in linear units)'
-		
-		if (dicSettings['scatSet']['mode'] == 'SSRGA') or (dicSettings['scatSet']['mode'] == 'Rayleigh') or (dicSettings['scatSet']['mode'] == 'SSRGA-Rayleigh'):
-			specXR['spec_H'] = specXR.spec_H/(10**(specXR.att_atm_ice_HH/10))
-		else:		
-			specXR['spec_H_att'] = specXR.spec_H/(10**(specXR.att_atm_ice_HH/10))
-			specXR['spec_V'] = specXR.spec_V/(10**(specXR.att_atm_ice_VV/10))
-			specXR['spec_HV'] = specXR.spec_HV/(10**(specXR.att_atm_ice_HH/10))
-		
-	if debugging:
-		print('total time for all heights was', time.time()-t0)
+			#if i > 50:
+			plt.pcolormesh(specXR.vel,specXR.range, 10*np.log10(specXR.spec_H.sel(wavelength=8,elevation=90,method='nearest')),cmap='turbo',vmin=-30,vmax=10)
+			plt.colorbar()
+			plt.xlim([-3,1])
+			plt.savefig('/project/meteo/work/L.Terzi/McSnow_habit/test_spec.png')
+			#plt.show()#
+			plt.close()
+
+
+			if dicSettings['attenuation'] == True:
+				
+				specXR['att_atm_ice_HH'] = 2*specXR.att_ice_HH.cumsum(dim='range') + 2*specXR.att_atmo.cumsum(dim='range')
+				specXR['att_atm_ice_VV'] = 2*specXR.att_ice_VV.cumsum(dim='range') + 2*specXR.att_atmo.cumsum(dim='range')
+				specXR.att_atm_ice_HH.attrs['long_name'] = '2 way attenuation at HH polarization'
+				specXR.att_atm_ice_HH.attrs['unit'] = 'dB'
+				specXR.att_atm_ice_HH.attrs['comment'] = '2 way attenuation for ice particles and atmospheric gases (N2,O2,H2O). The spectra are divided my this, so to get unattenuated spectra, multiply with this (in linear units)'
+				
+				specXR.att_atm_ice_HH.attrs['long_name'] = '2 way attenuation at VV polarization'
+				specXR.att_atm_ice_HH.attrs['unit'] = 'dB'
+				specXR.att_atm_ice_HH.attrs['comment'] = '2 way attenuation for ice particles and atmospheric gases (N2,O2,H2O). The spectra are divided my this, so to get unattenuated spectra, multiply with this (in linear units)'
+				
+				specXR['spec_H_att'] = specXR.spec_H/(10**(specXR.att_atm_ice_HH/10))
+				specXR['spec_V'] = specXR.spec_V/(10**(specXR.att_atm_ice_VV/10))
+				specXR['spec_HV'] = specXR.spec_HV/(10**(specXR.att_atm_ice_HH/10))
 	return specXR
 
 def singleParticleTrajectories(dicSettings, mcTable):
