@@ -160,11 +160,15 @@ def fullRadar(dicSettings, mcTable):
 	DDA_data_agg['logmass'] = np.log10(DDA_data_agg.mass)
 	DDA_data_agg['logDmax'] = np.log10(DDA_data_agg.Dmax)
 	#print(aggdb)
-	
+	print(dicSettings['beta_std'])
+	if dicSettings['beta_std'] == 0:
+		elevation_radius = 1
+	else:
+		elevation_radius = dicSettings['beta']
 	search_radii = dict(
-						logmass=abs(np.log10(1) - np.log10(1.05)), # 2 %
-						logDmax=abs(np.log10(1) - np.log10(1.05)), # 5 %
-						elevation = 5,
+						logmass=abs(np.log10(1) - np.log10(1.25)), # 2 %
+						logDmax=abs(np.log10(1) - np.log10(1.25)), # 5 %
+						elevation = elevation_radius, #5, introduce some wobbling here
 						wavelength = 0.1,
 						)
 	tree, scaling = gen_ckdtree(DDA_data_agg, search_radii)
@@ -179,7 +183,8 @@ def fullRadar(dicSettings, mcTable):
 			 					(mcTableAgg['sHeight']<=heightEdge1),drop=True)
 		mcTableCryTmp = mcTableCry.where((mcTableCry['sHeight']>heightEdge0) &
 			 					(mcTableCry['sHeight']<=heightEdge1),drop=True)
-		print(mcTableCryTmp)
+		#print(mcTableCryTmp)
+		#print(mcTableAggTmp)
 		if mcTableTmp.vel.any():
 			mcTableTmp = calcParticleZe(dicSettings['wl'], dicSettings['elv'], mcTableTmp,mcTableAggTmp,mcTableCryTmp, dicSettings['scatSet'],dicSettings['beta'],dicSettings['beta_std'],tree, scaling,DDA_data_agg)#,height=(heightEdge1+heightEdge0)/2)
 			#- get the spectra, there is the possibility to add shear, but I have not implemented it yet
@@ -189,22 +194,26 @@ def fullRadar(dicSettings, mcTable):
 										dicSettings['eps_diss'], dicSettings['uwind'],dicSettings['time_int'], dicSettings['theta']/2./180.*np.pi,
 										k_theta,k_phi,k_r, dicSettings['tau'])
 			tmpSpecXR = tmpSpecXR/vol
-			plt.plot(tmpSpecXR.vel,10*np.log10(tmpSpecXR.spec_H.sel(wavelength=3,elevation=90,range=(heightEdge1+heightEdge0)/2,method='nearest')))#range=(heightEdge1+heightEdge0)/2))
-			#plt.savefig('test_spec.png')
-			#plt.close()
-			plt.show()
+			#print(tmpSpecXR)
+			# plt.plot(tmpSpecXR.vel,10*np.log10(tmpSpecXR.spec_H.sel(wavelength=3,elevation=90,range=(heightEdge1+heightEdge0)/2,method='nearest')),label='W')#range=(heightEdge1+heightEdge0)/2))
+			# plt.plot(tmpSpecXR.vel,10*np.log10(tmpSpecXR.spec_H.sel(wavelength=8,elevation=90,range=(heightEdge1+heightEdge0)/2,method='nearest')),label='Ka')#range=(heightEdge1+heightEdge0)/2))
+			# plt.plot(tmpSpecXR.vel,10*np.log10(tmpSpecXR.spec_H.sel(wavelength=30,elevation=90,range=(heightEdge1+heightEdge0)/2,method='nearest')),label='X')#range=(heightEdge1+heightEdge0)/2))
+			# #plt.savefig('test_spec.png')
+			# #plt.close()
+			# plt.legend()
+			# plt.show()
 			
 			#quit()
 			tmpKdpXR =  getIntKdp(mcTableTmp,(heightEdge1+heightEdge0)/2)
 			specXR = xr.merge([specXR,tmpSpecXR, tmpKdpXR/vol])
 			#print(specXR)
 			#if i > 50:
-			plt.pcolormesh(specXR.vel,specXR.range, 10*np.log10(specXR.spec_H.sel(wavelength=8,elevation=90,method='nearest')),cmap='turbo',vmin=-30,vmax=10)
-			plt.colorbar()
-			plt.xlim([-3,1])
-			plt.savefig('/project/meteo/work/L.Terzi/McSnow_habit/test_spec.png')
-			#plt.show()#
-			plt.close()
+			# plt.pcolormesh(specXR.vel,specXR.range, 10*np.log10(specXR.spec_H.sel(wavelength=8,elevation=90,method='nearest')),cmap='turbo',vmin=-30,vmax=10)
+			# plt.colorbar()
+			# plt.xlim([-3,1])
+			# plt.savefig('/project/meteo/work/L.Terzi/McSnow_habit/test_spec_stoch_aggs.png')
+			# #plt.show()#
+			# plt.close()
 
 
 			if dicSettings['attenuation'] == True:

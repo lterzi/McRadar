@@ -27,78 +27,107 @@ selMode = 'KNeighborsRegressor'
 n_neighbors = 10
 scatMode = 'wobbling'
 attenuation = False
-lutPath = '/project/meteo/work/L.Terzi/McRadar/LUT/DDA/' #'/work/lvonterz/SSRGA/snowScatt/ssrga_LUT/' #'/data/optimice/McRadarLUTs/'
+lutPath = '/project/meteo/work/L.Terzi/McRadarTest/LUT/' #'/work/lvonterz/SSRGA/snowScatt/ssrga_LUT/' #'/data/optimice/McRadarLUTs/'
 # define the velocity vector:
 velVec = np.loadtxt('/project/meteo/work/L.Terzi/McSnow_depogrowth_paper/dopplerVelocities_Wband_CEL.txt')
 #-- define range resolution 
 heightRes = 36
 outName = '9.6_35.5_94.0GHz_output_DDA_KNeighborsRegressor_n_neigh10_30_90_oriavgTrue_beta0_beta_std0_convoluteTrue_attenuationFalse.nc'
 
-inputPath = '/project/meteo/work/L.Terzi/McSnowoutput/habit/case_studies/20220206/NewAggs//1d_habit_habit1_IGF2_xi100_nz200_dtc5_fpm2_0_mult1_frag1_Dmode75_timeend36000_nh12000_nh26000_ncl75_nclmass4.8_nuclType1_at2_stick2_agggeo5_spkernsig0_ba500_domtop6000._atmo1_radiosondes_juelich_20220206_042141/'
+#inputPath = '/project/meteo/work/L.Terzi/McSnowoutput/habit/case_studies/20220206/NewAggs//1d_habit_habit1_IGF2_xi100_nz200_dtc5_fpm2_0_mult1_frag1_Dmode75_timeend36000_nh12000_nh26000_ncl75_nclmass4.8_nuclType1_at2_stick2_agggeo5_spkernsig0_ba500_domtop6000._atmo1_radiosondes_juelich_20220206_042141/'
+allPaths = ['1d_habit1_xi016_nz250_lwc01_sat05_dt5_ncl42_rt2_habit1_agg1_AR00/',
+            #'1d_habit1_xi016_nz250_lwc01_sat05_dt5_ncl42_rt2_habit1_agg4_AR30/',
+            #'1d_habit1_xi016_nz250_lwc01_sat05_dt5_ncl42_rt2_habit1_agg5_AR30/',
+            #'1d_habit2_xi016_nz250_lwc01_sat05_dt5_ncl42_rt2_habit1_agg1_AR00/',
+            #'1d_habit2_xi016_nz250_lwc01_sat05_dt5_ncl42_rt2_habit1_agg4_AR30/',
+            #'1d_habit2_xi016_nz250_lwc01_sat05_dt5_ncl42_rt2_habit1_agg5_AR30/'
+			]
 
-domTop = inputPath.split('domtop')[1].split('_')[0].split('.')[0]
-box_area = inputPath.split('ba')[1].split('_')[0]
-box_area=float(box_area)/100 #In order to avoid volume sampling problems, you have to insert the gridBaseArea as it was defined in the McSnow simulation
+for inputPath in allPaths:
+    
+	inputPath = 'data/' + inputPath
+	print(inputPath)
+	#habit 1: first case,
+	# habit 2: second case
+	# agg1: mitchell, agg4: deterministic, agg5: stochastic
+	#1d_habit1_xi016_nz250_lwc01_sat05_dt5_ncl42_rt2_habit1_agg1_AR00/
+	#1d_habit1_xi016_nz250_lwc01_sat05_dt5_ncl42_rt2_habit1_agg4_AR30
+	#1d_habit1_xi016_nz250_lwc01_sat05_dt5_ncl42_rt2_habit1_agg5_AR30
+	#1d_habit2_xi016_nz250_lwc01_sat05_dt5_ncl42_rt2_habit1_agg1_AR00
+	#1d_habit2_xi016_nz250_lwc01_sat05_dt5_ncl42_rt2_habit1_agg4_AR30
+	#1d_habit2_xi016_nz250_lwc01_sat05_dt5_ncl42_rt2_habit1_agg5_AR30
 
-print('loading the settings')
-#minmax=True
-#vmin= 180; vmax=350
-# define the velocity vector:
+	mass2frname = 'mass2fr.nc' #'mass2fr.nc'
 
-#In order to avoid volume sampling problems, you have to insert the gridBaseArea as it was defined in the McSnow simulation
-dicSettings = mcr.loadSettings(dataPath=inputPath+'mass2fr.nc',atmoFile=inputPath+'atmo.dat',velVec=velVec,
-                               elv=elv, freq=freq,gridBaseArea=box_area,maxHeight=int(domTop),minHeight=0,
-                               heightRes=heightRes,convolute=convolute,attenuation=attenuation,beta=beta,beta_std=beta_std,
-                               scatSet={'mode':scatMode,'selmode':selMode,'n_neighbors':n_neighbors,'K2':0.93,'lutPath':lutPath,'orientational_avg':ori_avg})
+	#inputPath = 'data/McSnow_stoch_aggs/'
+	#domTop = inputPath.split('domtop')[1].split('_')[0].split('.')[0]
+	domTop = 5000.0 # in m, this is the height of the top of the domain
+	#box_area = inputPath.split('ba')[1].split('_')[0]
+	#box_area=float(box_area)/100 #In order to avoid volume sampling problems, you have to insert the gridBaseArea as it was defined in the McSnow simulation
+	box_area = 5.0
+	print('loading the settings')
+	#minmax=True
+	#vmin= 180; vmax=350
+	# define the velocity vector:
 
-print('loading the McSnow output')
-#quit()
-# now generate a table from the McSnow output.
-mcTable = mcr.getMcSnowTable(dicSettings['dataPath'])
-mcTable = mcTable.where(~np.isnan(mcTable.vel),drop=True)
+	#In order to avoid volume sampling problems, you have to insert the gridBaseArea as it was defined in the McSnow simulation
+	dicSettings = mcr.loadSettings(dataPath=inputPath+mass2frname,velVec=velVec, #atmoFile=inputPath+'atmo.dat',
+								elv=elv, freq=freq,gridBaseArea=box_area,maxHeight=int(domTop),minHeight=0,
+								heightRes=heightRes,convolute=convolute,attenuation=attenuation,beta=beta,beta_std=beta_std,onlyIce=False,
+								scatSet={'mode':scatMode,'selmode':selMode,'n_neighbors':n_neighbors,'K2':0.93,'lutPath':lutPath,'orientational_avg':ori_avg})
+
+	print('loading the McSnow output')
+	#quit()
+	# now generate a table from the McSnow output.
+	mcTable = mcr.getMcSnowTable(dicSettings['dataPath'])
+	mcTable = mcTable.where(~np.isnan(mcTable.vel),drop=True)
 
 
-#print('now here')
-times = mcTable['time']
-selTime = mcTable['time'].max()
-mcTableTmp = mcTable.where(times==selTime,drop=True)	#mcTable[times==selTime]#
-#print('after sel')
+	#print('now here')
+	if 'time' in mcTable:
+		times = mcTable['time']
+		selTime = mcTable['time'].max()
+		mcTableTmp = mcTable.where(times==selTime,drop=True)	#mcTable[times==selTime]#
+	else:
+		mcTableTmp = mcTable
+	#print('after sel')
 
-if dicSettings['onlyIce'] == True:
-	coldT = dicSettings['temp'].where(dicSettings['temp'] < 273.15,drop=True)
-	mcTableTmp = mcTableTmp.where((mcTableTmp['sHeight']>coldT.range.min().values) &
-				 					(mcTableTmp['sHeight']<=coldT.range.max().values),drop=True)
+	if dicSettings['onlyIce'] == True:
+		coldT = dicSettings['temp'].where(dicSettings['temp'] < 273.15,drop=True)
+		mcTableTmp = mcTableTmp.where((mcTableTmp['sHeight']>coldT.range.min().values) &
+										(mcTableTmp['sHeight']<=coldT.range.max().values),drop=True)
+	#print(mcTable.sMult.min().values, mcTable.sMult.max().values)
+	#quit()
+	print('getting things done :) -> calculating radar variables for '+str(freq)+'Hz')
+	#output = mcr.fullRadarParallel(dicSettings, mcTableTmp)
+	#print(output)
+	output = mcr.fullRadar(dicSettings, mcTableTmp)
+	#quit()
+	#- calculate moments and noise from the spectra:	
+	output['Ze_H'] = output['spec_H'].sum(dim='vel')
+	output['Ze_V'] = output['spec_V'].sum(dim='vel')
+	if 'spec_H_Agg' in output:
+		output['Ze_H_Agg'] = output['spec_H_Agg'].sum(dim='vel')
+		output['Ze_V_Agg'] = output['spec_V_Agg'].sum(dim='vel')
+		output['ZDR_Agg'] = mcr.lin2db(output['Ze_H_Agg']/output['Ze_H_Agg'])
 
-print('getting things done :) -> calculating radar variables for '+str(freq)+'Hz')
-#output = mcr.fullRadarParallel(dicSettings, mcTableTmp)
-#print(output)
-output = mcr.fullRadar(dicSettings, mcTableTmp)
-#quit()
-#- calculate moments and noise from the spectra:	
-output['Ze_H'] = output['spec_H'].sum(dim='vel')
-output['Ze_V'] = output['spec_V'].sum(dim='vel')
-if 'spec_H_Agg' in output:
-	output['Ze_H_Agg'] = output['spec_H_Agg'].sum(dim='vel')
-	output['Ze_V_Agg'] = output['spec_V_Agg'].sum(dim='vel')
-	output['ZDR_Agg'] = mcr.lin2db(output['Ze_H_Agg']/output['Ze_H_Agg'])
+	if 'spec_H_Mono' in output:
+		output['Ze_H_Mono'] = output['spec_H_Mono'].sum(dim='vel')
+		output['Ze_V_Mono'] = output['spec_V_Mono'].sum(dim='vel')
+		output['ZDR_Mono'] = mcr.lin2db(output['Ze_H_Mono']/output['Ze_H_Mono'])
 
-if 'spec_H_Mono' in output:
-	output['Ze_H_Mono'] = output['spec_H_Mono'].sum(dim='vel')
-	output['Ze_V_Mono'] = output['spec_V_Mono'].sum(dim='vel')
-	output['ZDR_Mono'] = mcr.lin2db(output['Ze_H_Mono']/output['Ze_H_Mono'])
-
-output['ZDR'] = mcr.lin2db(output['Ze_H']/output['Ze_H'])
-output['Ze_HV'] = output['spec_HV'].sum(dim='vel')
-output['LDR'] = mcr.lin2db(output['Ze_HV']/output['Ze_H'])
-output['MDV_H'] = (output['spec_H']*output['vel']).sum(dim='vel')/output['Ze_H']
-output['MDV_V'] = (output['spec_V']*output['vel']).sum(dim='vel')/output['Ze_V']
-#NoiseDens = dicSettings['noise_pow']/len(dicSettings['velCenterBin'])
-NoisePow = dicSettings['noise_pow']/(dicSettings['nfft']*dicSettings['velRes'])
-output['SNR_H'] = output['Ze_H']/NoisePow
-output['SNR_V'] = output['Ze_V']/NoisePow
-output['sSNR_H'] = output['spec_H']/dicSettings['noise_pow']
-output['sSNR_V'] = output['spec_V']/dicSettings['noise_pow']
-		
-#-- now save it
-output.to_netcdf(inputPath+outName)#inputPath+outName)
-#singlePart.to_netcdf(inputPath+'test_singlescattering.nc')
+	output['ZDR'] = mcr.lin2db(output['Ze_H']/output['Ze_H'])
+	output['Ze_HV'] = output['spec_HV'].sum(dim='vel')
+	output['LDR'] = mcr.lin2db(output['Ze_HV']/output['Ze_H'])
+	output['MDV_H'] = (output['spec_H']*output['vel']).sum(dim='vel')/output['Ze_H']
+	output['MDV_V'] = (output['spec_V']*output['vel']).sum(dim='vel')/output['Ze_V']
+	#NoiseDens = dicSettings['noise_pow']/len(dicSettings['velCenterBin'])
+	NoisePow = dicSettings['noise_pow']/(dicSettings['nfft']*dicSettings['velRes'])
+	output['SNR_H'] = output['Ze_H']/NoisePow
+	output['SNR_V'] = output['Ze_V']/NoisePow
+	output['sSNR_H'] = output['spec_H']/dicSettings['noise_pow']
+	output['sSNR_V'] = output['spec_V']/dicSettings['noise_pow']
+			
+	#-- now save it
+	output.to_netcdf(inputPath+outName)#inputPath+outName)
+	#singlePart.to_netcdf(inputPath+'test_singlescattering.nc')
