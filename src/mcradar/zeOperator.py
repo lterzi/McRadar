@@ -182,47 +182,94 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
 
             
             if len(mcTableAgg.mTot)>0:
+                from tqdm import tqdm
+                import time
+                start = time.time()
                 target = dict(
                         logmass     = np.log10(mcTableAgg.mTot.values),
                         logDmax     = np.log10(mcTableAgg.dia.values),
-                        elevation 	= np.ones(len(mcTableAgg.mTot.values))*elv, #elvs,
-                        wavelength  = np.ones(len(mcTableAgg.mTot.values))*wl, 
-                    ) 
-                #print(len(mcTableAggTmp.mTot.values))
+                        elevation 	= np.ones(len(mcTableAgg.mTot.values))*elv,
+                        wavelength  = np.ones(len(mcTableAgg.mTot.values))*wl,
+                    )
                 search_idx = search_ckdtree(tree, scaling, target)
-                                
-                for i_part, trgt, idx in (zip(range(len(mcTableAgg)), zip(*target.values()), search_idx)):
-                    #print(f"for super particle {trgt=}, we have {len(idx)=} entries") 
-                    scatPoints = DDA_data_agg.isel(index=idx)
 
-                    superparticle = mcTableAgg.isel(index=i_part)
-                    if len(scatPoints.index) > superparticle.sMult.values:
-                        idx_sel = np.random.choice(np.arange(0,len(scatPoints.index)-1), size = int(superparticle.sMult.values),replace=False)
-                    elif len(scatPoints.index)==0:
-                        print('Warning: no scatPoints found for superparticle {0}, wl {1}, elv {2}'.format(superparticle.index.values, wl,elv))
-                        print('dia',superparticle.dia.values, 'mass',superparticle.mTot.values)
-                        continue
-                    else:
-                        print('Warning: not enough scatPoints, sMult {0}, scatPoints {1}'.format(superparticle.sMult.values, len(scatPoints.index)))
-                        print(superparticle.dia.values, superparticle.mTot.values, superparticle.index.values, wl,elv)
-                        idx_sel = np.random.choice(np.arange(0,len(scatPoints.index)-1), size = int(superparticle.sMult.values),replace=True)
-                        
-                    # we can already sum the randomly selected points here, because otherwise we would have summed them for creating the Doppler spectra anyway. We just need to make sure that now the multiplicity is one now, so that this particle is only taken once into account for spectrum.
-                    mcTable['sZeH'].loc[elv,wl,superparticle.index] = scatPoints['ZeH'][idx_sel].values.sum()*2*np.pi 
-                    mcTable['sCextH'].loc[elv,wl,superparticle.index] = scatPoints['CextH'][idx_sel].values.sum()*2*np.pi 
-                    mcTable['sCextV'].loc[elv,wl,superparticle.index] = scatPoints['CextV'][idx_sel].values.sum()*2*np.pi 
-                    mcTable['sZeV'].loc[elv,wl,superparticle.index] = scatPoints['ZeV'][idx_sel].values.sum()*2*np.pi 
-                    mcTable['sZeHV'].loc[elv,wl,superparticle.index] = scatPoints['ZeHV'][idx_sel].values.sum()*2*np.pi 
-                    mcTable['sKDP'].loc[elv,wl,superparticle.index] = scatPoints['KDP'][idx_sel].values.sum()*2*np.pi 
-                    mcTable['sMult'].loc[superparticle.index] = 1
-                    
-                    
-                    
+                if False:
+                    for i_part, trgt, idx in tqdm(zip(range(mcTableAgg.index.size), zip(*target.values()), search_idx), total=mcTableAgg.index.size):
+                        #print(f"for super particle {trgt=}, we have {len(idx)=} entries") 
+                        scatPoints = DDA_data_agg.isel(index=idx)
+
+                        superparticle = mcTableAgg.isel(index=i_part)
+                        if len(scatPoints.index) > superparticle.sMult.values:
+                            idx_sel = np.random.choice(np.arange(0,len(scatPoints.index)-1), size = int(superparticle.sMult.values),replace=False)
+                        elif len(scatPoints.index)==0:
+                            print('Warning: no scatPoints found for superparticle {0}, wl {1}, elv {2}'.format(superparticle.index.values, wl,elv))
+                            print('dia',superparticle.dia.values, 'mass',superparticle.mTot.values)
+                            continue
+                        else:
+                            print('Warning: not enough scatPoints, sMult {0}, scatPoints {1}'.format(superparticle.sMult.values, len(scatPoints.index)))
+                            print(superparticle.dia.values, superparticle.mTot.values, superparticle.index.values, wl,elv)
+                            idx_sel = np.random.choice(np.arange(0,len(scatPoints.index)-1), size = int(superparticle.sMult.values),replace=True)
+
+                        # we can already sum the randomly selected points here, because otherwise we would have summed them for creating the Doppler spectra anyway.
+                        mcTable['sZeH'].loc[elv,wl,superparticle.index] = scatPoints['ZeH'][idx_sel].values.sum()*2*np.pi 
+                        mcTable['sCextH'].loc[elv,wl,superparticle.index] = scatPoints['CextH'][idx_sel].values.sum()*2*np.pi 
+                        mcTable['sCextV'].loc[elv,wl,superparticle.index] = scatPoints['CextV'][idx_sel].values.sum()*2*np.pi 
+                        mcTable['sZeV'].loc[elv,wl,superparticle.index] = scatPoints['ZeV'][idx_sel].values.sum()*2*np.pi 
+                        mcTable['sZeHV'].loc[elv,wl,superparticle.index] = scatPoints['ZeHV'][idx_sel].values.sum()*2*np.pi 
+                        mcTable['sKDP'].loc[elv,wl,superparticle.index] = scatPoints['KDP'][idx_sel].values.sum()*2*np.pi 
+                        # mcTable['sMult'].loc[superparticle.index] = 1 # Note, cant do it here because it would change results next iteration
+                    print(f"aggregate scattering lookup took {time.time() - start}s")
+                else:
+                    def scatLookup():
+                        variables = ('ZeH', 'CextH', 'CextV', 'ZeV', 'ZeHV', 'KDP')
+                        result = mcTableAgg.sel(elevation=elv, wavelength=wl).get([f"s{_}" for _ in variables]).copy() # local slice that gets updated
+                        not_found_particles = []
+                        for isp, idx in enumerate(tqdm(search_idx)):
+                            if len(idx) < 1:
+                                #raise ( ValueError(f'Could not find scattering props for aggregate: {elv=} {wl=} {mcTableAgg.isel(index=isp).get(["mTot","dia"]).to_dict()=}') )
+                                not_found_particles.append(isp)
+                                continue
+
+                            xi = int(mcTableAgg.sMult[isp])
+
+                            # for now we accept all acceptable scattering aggregates with equal weight
+                            if True:
+                                # randomly take xi many out of candidates
+                                idx = np.random.choice(idx, min(len(idx), xi), replace=False)
+                            else:
+                                # we just take the first ones up to xi
+                                idx = idx[:xi]
+                            Ncandidates = len(idx)
+
+                            wgt = np.ones(Ncandidates) * xi / Ncandidates
+
+                            # normalize to make sure however many candidates we have, we end up with xi contribution
+                            wgt *= 2 * np.pi * xi / np.sum(wgt)
+
+                            for v in variables:
+                                result[f"s{v}"][isp] = np.sum(DDA_data_agg[v].data[idx] * wgt)
+
+                        return result, not_found_particles
+
+                    scat_agg, not_found_particles = scatLookup()
+                    print(f"aggregate scattering lookup took {time.time() - start}s")
+
+                    if len(not_found_particles) > 1:
+                        print(f"Warning, we have {len(not_found_particles)} of {len(search_idx)} sps that did not match the DDA scatter db")
+                        print(f"Missing mass: {float(mcTableAgg.mTot.isel(index=not_found_particles).sum())} of {float(mcTableAgg.mTot.sum())} ",
+                                f"({100*float(mcTableAgg.mTot.isel(index=not_found_particles).sum()) / float(mcTableAgg.mTot.sum())}%)")
+
+                    for k,v in scat_agg.data_vars.items():
+                        mcTable[k].loc[dict(elevation=elv, wavelength=wl, index=scat_agg.index)] = v
+
+
             #plt.semilogx(mcTable.dia.loc[mcTableAgg.index], 10*np.log10(mcTable.sZeH.loc[elv,wl,mcTableAgg.index]),'.',label='cbck_h',ls='None',c='C1')
     #plt.show()
 
                 #plt.savefig('test_cbck_h.png')
-            
+
+    # We just need to make sure that now the multiplicity is one now, so that this particle is only taken once into account for spectrum.
+    mcTable['sMult'].loc[dict(index=mcTableAgg.index)] = 1
 
     return mcTable
 

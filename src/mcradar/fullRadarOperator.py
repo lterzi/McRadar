@@ -21,11 +21,15 @@ debugging=True
 reduce_ncores = True
 
 def gen_ckdtree(aggdb, search_radii):
+    import time
+    start = time.time()
     scaling = np.array([1.0 / search_radii[dim] for dim in search_radii.keys()]) # scale euclidean space for search
     points = np.stack([aggdb[dim] for dim in search_radii.keys()], axis=-1) # sample points out of aggdb
     scaled_points = points * scaling
     tree = cKDTree(scaled_points)
-    return tree, scaling 
+    end = time.time()
+    print(f"construction of ckdtree took {end - start}s")
+    return tree, scaling
 
 def getRadarParParallel(heightEdge0,mcTable,mcTableAgg,mcTableCry,dicSettings,tree,scaling,DDA_data_agg):#heightRes,wl,elv,ndgsVal,scatSet,velBins,velCenterBin,convolute,nave,noise_pow,eps_diss,uwind,time_int,theta,tau):
 	vol = dicSettings['gridBaseArea'] * dicSettings['heightRes']
