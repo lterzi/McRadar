@@ -77,7 +77,7 @@ def getMultFrecSpec(wls, elvs, mcTable, velBins, velCenterBins , centerHeight,
     specTable['spec_V'] = group['sZeMultV'].rename({'vel_bins':'vel'})
     specTable['spec_HV'] = group['sZeMultHV'].rename({'vel_bins':'vel'})
     
-    print(convolute)
+    #print(convolute)
     if convolute == True:
         for wl,th,nv,noise in zip(wls,theta,nave,noise_pow):
             

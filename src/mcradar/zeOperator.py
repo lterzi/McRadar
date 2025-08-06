@@ -106,7 +106,7 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
     
     if scatSet['mode']== 'wobbling':
         betas = np.random.normal(loc=beta, scale=beta_std, size=len(mcTableCry.dia))
-        DDA_data_cry = xr.open_dataset(scatSet['lutPath']+'scattering_properties_all_crystals_withbetanew.nc') #all_crystals #only_beta2.0000e-01_gamma1.5849e-04_
+        DDA_data_cry = xr.open_dataset(scatSet['lutPath']+'scattering_properties_all_crystals_withbetanew_kdp1.nc') #all_crystals #only_beta2.0000e-01_gamma1.5849e-04_
         
         if 'D_max' in DDA_data_cry:
             DDA_data_cry = DDA_data_cry.rename({'D_max':'Dmax'})
@@ -143,26 +143,7 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                 # Fit the KNeighborsRegressor
                 if scatSet['selmode'] == 'KNeighborsRegressor':
                     knn = neighbors.KNeighborsRegressor(scatSet['n_neighbors'],weights='distance')
-                    #print(np.isnan(DDA_elv_cry).any())
-                    # in order to apply the log, all values need to be positive, so we are going to shift all values by the minimum value (except for Z11 because this is always positive)
-                    # scatPoints = {'reflect_hh':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Ze_h.values)).predict(mcSnowPointsCry)),#'Z11':10**knn.fit(pointsCry, np.log10(DDA_elv_cry.Z11.values)).predict(mcSnowPointsCry),
-                    #                 'reflect_vv':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Ze_v.values)).predict(mcSnowPointsCry)),
-                    #                 'reflect_hv':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Ze_hv.values+abs(np.max(DDA_elv_cry.Ze_hv.values)))).predict(mcSnowPointsCry))-abs(np.max(DDA_elv_cry.Ze_hv.values)),
-                    #                 'cext_h':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.cext_hh.values+2*abs(np.min(DDA_elv_cry.cext_hh.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.cext_hh.values)),
-                    #                 'cext_v':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.cext_vv.values+2*abs(np.min(DDA_elv_cry.cext_vv.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.cext_vv.values)),
-                    #                 'kdp':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.kdp.values+2*abs(np.min(DDA_elv_cry.kdp.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.kdp.values)),
-
-                    #                 'Z11':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z11.values+abs(np.min(DDA_elv_cry.Z11.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Z11.values))-1,
-                    #                 'Z12':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z12.values+abs(np.min(DDA_elv_cry.Z12.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Z12.values))-1,
-                    #                 'Z21':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z21.values+abs(np.min(DDA_elv_cry.Z21.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Z21.values))-1,
-                    #                 'Z22':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z22.values+abs(np.min(DDA_elv_cry.Z22.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Z22.values))-1,
-                    #                 'S11i':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S11i.values+abs(np.min(DDA_elv_cry.S11i.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.S11i.values))-1,
-                    #                 'S22i':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S22i.values+abs(np.min(DDA_elv_cry.S22i.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.S22i.values))-1,
-                    #                 'S11r':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S11r.values+abs(np.min(DDA_elv_cry.S11r.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.S11r.values))-1,
-                    #                 'S22r':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S22r.values+abs(np.min(DDA_elv_cry.S22r.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.S22r.values))-1,
-                                    
-                    #                 }
-                    #print(DDA_elv_cry)
+                    
                     scatPoints = {'cbck_h':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Ze_h.values)).predict(mcSnowPointsCry)),#'Z11':10**knn.fit(pointsCry, np.log10(DDA_elv_cry.Z11.values)).predict(mcSnowPointsCry),
                                     'cbck_v':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Ze_v.values)).predict(mcSnowPointsCry)),
                                     'cbck_hv':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Ze_hv.values+abs(np.min(DDA_elv_cry.Ze_hv.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Ze_hv.values))-1,
@@ -192,6 +173,7 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                         wavelength  = np.ones(len(mcTableAgg.mTot.values))*wl,
                     )
                 search_idx = search_ckdtree(tree, scaling, target)
+
 
                 if False:
                     for i_part, trgt, idx in tqdm(zip(range(mcTableAgg.index.size), zip(*target.values()), search_idx), total=mcTableAgg.index.size):
@@ -261,6 +243,7 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
 
                     for k,v in scat_agg.data_vars.items():
                         mcTable[k].loc[dict(elevation=elv, wavelength=wl, index=scat_agg.index)] = v
+
 
 
             #plt.semilogx(mcTable.dia.loc[mcTableAgg.index], 10*np.log10(mcTable.sZeH.loc[elv,wl,mcTableAgg.index]),'.',label='cbck_h',ls='None',c='C1')
