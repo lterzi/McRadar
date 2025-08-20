@@ -107,9 +107,10 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
         if 'D_max' in DDA_data_cry:
             DDA_data_cry = DDA_data_cry.rename({'D_max':'Dmax'})
     elif scatSet['mode']== 'azimuthal_random_orientation':
-        betas = np.random.normal(loc=beta, scale=beta_std, size=len(mcTableCry.dia))
-        DDA_data_cry = xr.open_dataset(scatSet['lutPath']+'scattering_properties_all_crystals_withbetanew.nc') #all_crystals #only_beta2.0000e-01_gamma1.5849e-04_
-        DDA_data_agg = xr.open_dataset(scatSet['lutPath']+'scattering_properties_all_aggregates.nc')
+        betasCry = np.random.normal(loc=beta, scale=beta_std, size=len(mcTableCry.dia))
+        betasAgg = np.random.normal(loc=beta, scale=beta_std, size=len(mcTableAgg.dia))
+        DDA_data_cry = xr.open_dataset(scatSet['lutPath']+'scattering_properties_all_crystals_withbetanew_kdp1.nc') #all_crystals #only_beta2.0000e-01_gamma1.5849e-04_
+        DDA_data_agg = xr.open_dataset(scatSet['lutPath']+'scattering_properties_all_aggregates_withbeta.nc') #scattering_properties_all_aggregates.nc
         if 'D_max' in DDA_data_agg:
             DDA_data_agg = DDA_data_agg.rename({'D_max':'Dmax'})
         if 'D_max' in DDA_data_cry:
@@ -139,7 +140,7 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
             if len(mcTableCry.sPhi)>0: # only possible if we have plate-like particles
                 if scatSet['mode'] == 'azimuthal_random_orientation':
                     pointsCry = np.array(list(zip(np.log10(DDA_elv_cry.Dmax), np.log10(DDA_elv_cry.mass), np.log10(DDA_elv_cry.ar),DDA_elv_cry.beta)))
-                    mcSnowPointsCry = np.array(list(zip(np.log10(mcTableCry.dia), np.log10(mcTableCry.mTot), np.log10(mcTableCry.sPhi),betas)))
+                    mcSnowPointsCry = np.array(list(zip(np.log10(mcTableCry.dia), np.log10(mcTableCry.mTot), np.log10(mcTableCry.sPhi),betasCry)))
                 elif scatSet['mode']== 'fixed_orientation':
                     pointsCry = np.array(list(zip(np.log10(DDA_elv_cry.Dmax), np.log10(DDA_elv_cry.mass), np.log10(DDA_elv_cry.ar))))
                     mcSnowPointsCry = np.array(list(zip(np.log10(mcTableCry.dia), np.log10(mcTableCry.mTot), np.log10(mcTableCry.sPhi))))
@@ -157,14 +158,14 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                                     'cext_v':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.cext_vv.values+2*abs(np.min(DDA_elv_cry.cext_vv.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.cext_vv.values)),
                                     'kdp':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.kdp.values+2*abs(np.min(DDA_elv_cry.kdp.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.kdp.values)),
 
-                                    'Z11':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z11.values+abs(np.min(DDA_elv_cry.Z11.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Z11.values))-1,
-                                    'Z12':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z12.values+abs(np.min(DDA_elv_cry.Z12.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Z12.values))-1,
-                                    'Z21':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z21.values+abs(np.min(DDA_elv_cry.Z21.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Z21.values))-1,
-                                    'Z22':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z22.values+abs(np.min(DDA_elv_cry.Z22.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Z22.values))-1,
-                                    'S11i':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S11i.values+abs(np.min(DDA_elv_cry.S11i.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.S11i.values))-1,
-                                    'S22i':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S22i.values+abs(np.min(DDA_elv_cry.S22i.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.S22i.values))-1,
-                                    'S11r':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S11r.values+abs(np.min(DDA_elv_cry.S11r.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.S11r.values))-1,
-                                    'S22r':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S22r.values+abs(np.min(DDA_elv_cry.S22r.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.S22r.values))-1,
+                                    #'Z11':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z11.values+abs(np.min(DDA_elv_cry.Z11.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Z11.values))-1,
+                                    #'Z12':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z12.values+abs(np.min(DDA_elv_cry.Z12.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Z12.values))-1,
+                                    #'Z21':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z21.values+abs(np.min(DDA_elv_cry.Z21.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Z21.values))-1,
+                                    #'Z22':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Z22.values+abs(np.min(DDA_elv_cry.Z22.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Z22.values))-1,
+                                    #'S11i':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S11i.values+abs(np.min(DDA_elv_cry.S11i.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.S11i.values))-1,
+                                    #'S22i':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S22i.values+abs(np.min(DDA_elv_cry.S22i.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.S22i.values))-1,
+                                    #'S11r':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S11r.values+abs(np.min(DDA_elv_cry.S11r.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.S11r.values))-1,
+                                    #'S22r':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.S22r.values+abs(np.min(DDA_elv_cry.S22r.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.S22r.values))-1,
                                     
                                     }
                 
@@ -177,9 +178,9 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                             #warnings.warn('No points found in radius, please increase radius!!!')
                             raise ValueError('No points found in radius, please increase radius!!!')# if we do not have any points wihtin the radius, we cannot calculate the scattering properties
 
-                    scatPoints={'cbck_h':10**np.array([(np.log10(DDA_elv_cry.c_bck_h.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
-                                'cbck_v':10**np.array([(np.log10(DDA_elv_cry.c_bck_v.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
-                                'cbck_hv':10**np.array([(np.log10(DDA_elv_cry.c_bck_hv.values+abs(np.max(DDA_elv_cry.c_bck_hv.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-abs(np.max(DDA_elv_cry.c_bck_hv.values)),
+                    scatPoints={'reflect_hh':10**np.array([(np.log10(DDA_elv_cry.Ze_h.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
+                                'reflect_vv':10**np.array([(np.log10(DDA_elv_cry.Ze_v.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
+                                'reflect_hv':10**np.array([(np.log10(DDA_elv_cry.Ze_hv.values+abs(np.max(DDA_elv_cry.Ze_hv.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-abs(np.max(DDA_elv_cry.Ze_hv.values)),
                                 'cext_h':10**np.array([(np.log10(DDA_elv_cry.cext_hh.values+2*abs(np.min(DDA_elv_cry.cext_hh.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_cry.cext_hh.values)),
                                 'cext_v':10**np.array([(np.log10(DDA_elv_cry.cext_vv.values+2*abs(np.min(DDA_elv_cry.cext_vv.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_cry.cext_vv.values)),
                                 'kdp':10**np.array([(np.log10(DDA_elv_cry.kdp.values+2*abs(np.min(DDA_elv_cry.kdp.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_cry.kdp.values)),
@@ -201,9 +202,9 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                     neigh = NearestNeighbors(n_neighbors=scatSet['n_neighbors'])
                     neigh.fit(pointsCry)
                     distances, indices = neigh.kneighbors(mcSnowPointsCry)
-                    scatPoints={'cbck_h':10**np.array([(np.log10(DDA_elv_cry.c_bck_h.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
-                                'cbck_v':10**np.array([(np.log10(DDA_elv_cry.c_bck_v.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
-                                'cbck_hv':10**np.array([(np.log10(DDA_elv_cry.c_bck_hv.values+abs(np.max(DDA_elv_cry.c_bck_hv.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-abs(np.max(DDA_elv_cry.c_bck_hv.values)),
+                    scatPoints={'reflect_hh':10**np.array([(np.log10(DDA_elv_cry.Ze_h.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
+                                'reflect_vv':10**np.array([(np.log10(DDA_elv_cry.Ze_v.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
+                                'reflect_hv':10**np.array([(np.log10(DDA_elv_cry.Ze_hv.values+abs(np.max(DDA_elv_cry.Ze_hv.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-abs(np.max(DDA_elv_cry.Ze_hv.values)),
                                 'cext_h':10**np.array([(np.log10(DDA_elv_cry.cext_hh.values+2*abs(np.min(DDA_elv_cry.cext_hh.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_cry.cext_hh.values)),
                                 'cext_v':10**np.array([(np.log10(DDA_elv_cry.cext_vv.values+2*abs(np.min(DDA_elv_cry.cext_vv.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_cry.cext_vv.values)),
                                 'kdp':10**np.array([(np.log10(DDA_elv_cry.kdp.values+2*abs(np.min(DDA_elv_cry.kdp.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_cry.kdp.values)),
@@ -248,28 +249,30 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
             if len(mcTableAgg.mTot)>0: # only if aggregates are here
                 scatPoints={}
                 if scatSet['mode'] == 'azimuthal_random_orientation':
-                    pointsAgg = np.array(list(zip(np.log10(DDA_elv_agg.Dmax), np.log10(DDA_elv_agg.mass)))) # we need to differentiate here because for aggregates we are only selecting with mass and Dmax
-                    mcSnowPointsAgg = np.array(list(zip(np.log10(mcTableAgg.dia), np.log10(mcTableAgg.mTot)))) 
+                    pointsAgg = np.array(list(zip(np.log10(DDA_elv_agg.Dmax), np.log10(DDA_elv_agg.mass),DDA_elv_agg.beta)))
+                    #print(np.isnan(DDA_elv_agg.Ze_h.values).any())
+                    mcSnowPointsAgg = np.array(list(zip(np.log10(mcTableAgg.dia), np.log10(mcTableAgg.mTot), betasAgg)))
+                    #print(mcSnowPointsAgg.shape, mcTableAgg.dia.shape, mcTableAgg.mTot.shape)
                 elif scatSet['mode']== 'fixed_orientation':
                     pointsAgg = np.array(list(zip(np.log10(DDA_elv_agg.Dmax), np.log10(DDA_elv_agg.mass)))) # we need to differentiate here because for aggregates we are only selecting with mass and Dmax
                     mcSnowPointsAgg = np.array(list(zip(np.log10(mcTableAgg.dia), np.log10(mcTableAgg.mTot)))) 
                 if scatSet['selmode'] == 'KNeighborsRegressor':
                     knn = neighbors.KNeighborsRegressor(scatSet['n_neighbors'],weights='distance')
                     # in order to apply the log, all values need to be positive, so we are going to shift all values by the minimum value (except for Z11 because this is always positive)
-                    scatPoints = {'cbck_h':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.c_bck_h.values)).predict(mcSnowPointsAgg)),#'Z11':10**knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z11.values)).predict(mcSnowPointsAgg),
-                                    'cbck_v':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.c_bck_v.values)).predict(mcSnowPointsAgg)),
-                                    'cbck_hv':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.c_bck_hv.values+abs(np.max(DDA_elv_agg.c_bck_hv.values)))).predict(mcSnowPointsAgg))-abs(np.max(DDA_elv_agg.c_bck_hv.values)),
+                    scatPoints = {'reflect_hh':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Ze_h.values)).predict(mcSnowPointsAgg)),#'Z11':10**knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z11.values)).predict(mcSnowPointsAgg),
+                                    'reflect_vv':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Ze_v.values)).predict(mcSnowPointsAgg)),
+                                    'reflect_hv':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Ze_hv.values+abs(np.max(DDA_elv_agg.Ze_hv.values)))).predict(mcSnowPointsAgg))-abs(np.max(DDA_elv_agg.Ze_hv.values)),
                                     'cext_h':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.cext_hh.values)).predict(mcSnowPointsAgg)),
                                     'cext_v':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.cext_vv.values+2*abs(np.min(DDA_elv_agg.cext_vv.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.cext_vv.values)),
                                     'kdp':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.kdp.values+2*abs(np.min(DDA_elv_agg.kdp.values)))).predict(mcSnowPointsAgg))-2*abs(np.min(DDA_elv_agg.kdp.values)),
-                                 'Z11':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z11.values+abs(np.min(DDA_elv_agg.Z11.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.Z11.values))-1,
-                                 'Z12':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z12.values+abs(np.min(DDA_elv_agg.Z12.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.Z12.values))-1,
-                                 'Z21':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z21.values+abs(np.min(DDA_elv_agg.Z21.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.Z21.values))-1,
-                                 'Z22':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z22.values+abs(np.min(DDA_elv_agg.Z22.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.Z22.values))-1,
-                                 'S11i':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S11i.values+abs(np.min(DDA_elv_agg.S11i.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.S11i.values))-1,
-                                 'S22i':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S22i.values+abs(np.min(DDA_elv_agg.S22i.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.S22i.values))-1,
-                                 'S11r':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S11r.values+abs(np.min(DDA_elv_agg.S11r.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.S11r.values))-1,
-                                 'S22r':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S22r.values+abs(np.min(DDA_elv_agg.S22r.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.S22r.values))-1,
+                                 #'Z11':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z11.values+abs(np.min(DDA_elv_agg.Z11.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.Z11.values))-1,
+                                 #'Z12':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z12.values+abs(np.min(DDA_elv_agg.Z12.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.Z12.values))-1,
+                                 #'Z21':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z21.values+abs(np.min(DDA_elv_agg.Z21.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.Z21.values))-1,
+                                 #'Z22':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.Z22.values+abs(np.min(DDA_elv_agg.Z22.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.Z22.values))-1,
+                                 #'S11i':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S11i.values+abs(np.min(DDA_elv_agg.S11i.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.S11i.values))-1,
+                                 #'S22i':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S22i.values+abs(np.min(DDA_elv_agg.S22i.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.S22i.values))-1,
+                                 #'S11r':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S11r.values+abs(np.min(DDA_elv_agg.S11r.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.S11r.values))-1,
+                                 #'S22r':10**(knn.fit(pointsAgg, np.log10(DDA_elv_agg.S22r.values+abs(np.min(DDA_elv_agg.S22r.values))+1)).predict(mcSnowPointsAgg))-abs(np.min(DDA_elv_agg.S22r.values))-1,
                                     }
                 
                 elif scatSet['selmode'] == 'radius':
@@ -281,9 +284,9 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                             #warnings.warn('No points found in radius, please increase radius!!!')
                             raise ValueError('No points found in radius, please increase radius!!!')# if we do not have any points wihtin the radius, we cannot calculate the scattering properties
 
-                    scatPoints={'cbck_h':10**np.array([(np.log10(DDA_elv_agg.c_bck_h.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
-                                'cbck_v':10**np.array([(np.log10(DDA_elv_agg.c_bck_v.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
-                                'cbck_hv':10**np.array([(np.log10(DDA_elv_agg.c_bck_hv.values+2*abs(np.min(DDA_elv_agg.c_bck_hv.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_agg.c_bck_hv.values)),
+                    scatPoints={'reflect_hh':10**np.array([(np.log10(DDA_elv_agg.Ze_h.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
+                                'reflect_vv':10**np.array([(np.log10(DDA_elv_agg.Ze_v.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
+                                'reflect_hv':10**np.array([(np.log10(DDA_elv_agg.Ze_hv.values+2*abs(np.min(DDA_elv_agg.Ze_hv.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_agg.Ze_hv.values)),
                                 'cext_h':10**np.array([(np.log10(DDA_elv_agg.cext_hh.values+2*abs(np.min(DDA_elv_agg.cext_hh.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_agg.cext_hh.values)),
                                 'cext_v':10**np.array([(np.log10(DDA_elv_agg.cext_vv.values+2*abs(np.min(DDA_elv_agg.cext_vv.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_agg.cext_vv.values)),
                                 'kdp':10**np.array([(np.log10(DDA_elv_agg.kdp.values+2*abs(np.min(DDA_elv_agg.kdp.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_agg.kdp.values)),
@@ -304,9 +307,9 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                     neigh = NearestNeighbors(n_neighbors=scatSet['n_neighbors'])
                     neigh.fit(pointsAgg)
                     distances, indices = neigh.kneighbors(mcSnowPointsAgg)
-                    scatPoints={'cbck_h':10**np.array([(np.log10(DDA_elv_agg.c_bck_h.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
-                                'cbck_v':10**np.array([(np.log10(DDA_elv_agg.c_bck_v.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
-                                'cbck_hv':10**np.array([(np.log10(DDA_elv_agg.c_bck_hv.values+2*abs(np.min(DDA_elv_agg.c_bck_hv.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_agg.c_bck_hv.values)),
+                    scatPoints={'reflect_hh':10**np.array([(np.log10(DDA_elv_agg.Ze_h.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
+                                'reflect_vv':10**np.array([(np.log10(DDA_elv_agg.Ze_v.values))[idx].mean() if len(idx) > 0 else np.nan for idx in indices]),
+                                'reflect_hv':10**np.array([(np.log10(DDA_elv_agg.Ze_hv.values+2*abs(np.min(DDA_elv_agg.Ze_hv.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_agg.Ze_hv.values)),
                                 'cext_h':10**np.array([(np.log10(DDA_elv_agg.cext_hh.values+2*abs(np.min(DDA_elv_agg.cext_hh.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_agg.cext_hh.values)),
                                 'cext_v':10**np.array([(np.log10(DDA_elv_agg.cext_vv.values+2*abs(np.min(DDA_elv_agg.cext_vv.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_agg.cext_vv.values)),
                                 'kdp':10**np.array([(np.log10(DDA_elv_agg.kdp.values+2*abs(np.min(DDA_elv_agg.kdp.values))))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-2*abs(np.min(DDA_elv_agg.kdp.values)),
@@ -321,14 +324,15 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                                 # 'S22r':10**np.array([(np.log10(DDA_elv_agg.S22r.values+abs(np.min(DDA_elv_agg.S22r.values))+1))[idx].mean() if len(idx) > 0 else np.nan for idx in indices])-abs(np.min(DDA_elv_agg.S22r.values))-1,
                                 }
                                 
-                reflect_h,  reflect_v, reflect_hv, kdp_M1, rho_hv, cext_hh, cext_vv = radarScat(scatPoints, wl,scatSet['K2'])
-                
-                mcTable['sZeH'].loc[elv,wl,mcTableAgg.index] = reflect_h #scatPoints['cbck_h']
-                mcTable['sZeV'].loc[elv,wl,mcTableAgg.index] = reflect_v #scatPoints['cbck_v']
-                mcTable['sZeHV'].loc[elv,wl,mcTableAgg.index] = reflect_hv #scatPoints['cbck_hv']
-                mcTable['sKDP'].loc[elv,wl,mcTableAgg.index] = kdp_M1 #scatPoints['kdp']
-                mcTable['sCextH'].loc[elv,wl,mcTableAgg.index] = cext_hh #scatPoints['cext_h']
-                mcTable['sCextV'].loc[elv,wl,mcTableAgg.index] = cext_vv #scatPoints['cext_v']
+                #reflect_h,  reflect_v, reflect_hv, kdp_M1, rho_hv, cext_hh, cext_vv = radarScat(scatPoints, wl,scatSet['K2'])
+                #print(len(scatPoints['reflect_hh']))
+                #print(len(mcTableAgg.index))
+                mcTable['sZeH'].loc[elv,wl,mcTableAgg.index] = scatPoints['reflect_hh']
+                mcTable['sZeV'].loc[elv,wl,mcTableAgg.index] = scatPoints['reflect_vv']
+                mcTable['sZeHV'].loc[elv,wl,mcTableAgg.index] = scatPoints['reflect_hv']
+                mcTable['sKDP'].loc[elv,wl,mcTableAgg.index] = scatPoints['kdp']
+                mcTable['sCextH'].loc[elv,wl,mcTableAgg.index] = scatPoints['cext_h']
+                mcTable['sCextV'].loc[elv,wl,mcTableAgg.index] = scatPoints['cext_v']
 
 
 

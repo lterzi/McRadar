@@ -17,7 +17,7 @@ from .fullRadarOperator import fullRadar
 from .fullRadarOperator import fullRadarParallel
 
 from .fullRadarOperator import singleParticleTrajectories
-from .fullRadarOperator import singleParticleScat
+#from .fullRadarOperator import singleParticleScat
 
 from .utilities import *
 
