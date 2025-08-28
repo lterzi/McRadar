@@ -1,17 +1,12 @@
 # -*- coding: utf-8 -*-
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
-import subprocess
 import numpy as np
 import xarray as xr
-from glob import glob
-from scipy import constants
-from mcradar.tableOperator import creatRadarCols
 import warnings
-import matplotlib.pyplot as plt
 import time
-from sklearn.neighbors import NearestNeighbors
 from sklearn import neighbors
+from tqdm import tqdm
 
 debugging = False
 onlyInterp = False
@@ -66,7 +61,7 @@ def search_ckdtree(tree, scaling, target):
 	idx = tree.query_ball_point(scaled_target, r=1.0)
 	return idx 
 
-def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_std,tree,scaling,DDA_data_agg):#zeOperator
+def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_std,treeAgg,scalingAgg,treeCry,scalingCry,DDA_data_agg,DDA_data_cry):#zeOperator
     """
     Calculates the horizontal and vertical reflectivity of 
     each superparticle from a given distribution of super 
@@ -103,76 +98,128 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
     """
     scatPoints={}
     # different DDA LUT for monomers and Aggregates. 
-    
-    if scatSet['mode']== 'wobbling':
-        betas = np.random.normal(loc=beta, scale=beta_std, size=len(mcTableCry.dia))
-        DDA_data_cry = xr.open_dataset(scatSet['lutPath']+'scattering_properties_all_crystals_withbetanew_kdp1.nc') #all_crystals #only_beta2.0000e-01_gamma1.5849e-04_
-        
-        if 'D_max' in DDA_data_cry:
-            DDA_data_cry = DDA_data_cry.rename({'D_max':'Dmax'})
-    elif scatSet['mode'] == 'fixed_orientation':
-        DDA_data_cry = xr.open_dataset(scatSet['lutPath']+'scattering_properties_all_crystals.nc') #all_crystals #only_beta2.0000e-01_gamma1.5849e-04_
-        if 'D_max' in DDA_data_cry:
-            DDA_data_cry = DDA_data_cry.rename({'D_max':'Dmax'})
-    else:
-        raise ValueError('Unknown mode: '+scatSet['mode']+'! Please choose between "fixed_orientation" and "wobbling"!')
+    if True:
+        if scatSet['mode']== 'wobbling':
+            betas = np.random.normal(loc=beta, scale=beta_std, size=len(mcTableCry.dia))
+            DDA_data_cry = xr.open_dataset(scatSet['lutPath']+'scattering_properties_all_crystals_withbetanew_kdp1.nc') #all_crystals #only_beta2.0000e-01_gamma1.5849e-04_
+            
+            if 'D_max' in DDA_data_cry:
+                DDA_data_cry = DDA_data_cry.rename({'D_max':'Dmax'})
+        elif scatSet['mode'] == 'fixed_orientation':
+            DDA_data_cry = xr.open_dataset(scatSet['lutPath']+'scattering_properties_all_crystals.nc') #all_crystals #only_beta2.0000e-01_gamma1.5849e-04_
+            if 'D_max' in DDA_data_cry:
+                DDA_data_cry = DDA_data_cry.rename({'D_max':'Dmax'})
+        else:
+            raise ValueError('Unknown mode: '+scatSet['mode']+'! Please choose between "fixed_orientation" and "wobbling"!')
 
-    DDA_data_cry = DDA_data_cry.to_dataframe()
+        DDA_data_cry = DDA_data_cry.to_dataframe()
     # generate points to look up in the DDA LUT
     for i,wl in enumerate(wls):
         
-        wl_close = DDA_data_cry.iloc[(DDA_data_cry['wavelength']-wl).abs().argsort()].wavelength.values[0] # get closest wavelength to select from LUT
-        DDA_wl_cry = DDA_data_cry[DDA_data_cry.wavelength==wl_close]
+        if True:
+            wl_close = DDA_data_cry.iloc[(DDA_data_cry['wavelength']-wl).abs().argsort()].wavelength.values[0] # get closest wavelength to select from LUT
+            DDA_wl_cry = DDA_data_cry[DDA_data_cry.wavelength==wl_close]
         
         for elv in elvs:
-            
-            el_close = DDA_wl_cry.iloc[(DDA_wl_cry['elevation']-elv).abs().argsort()].elevation.values[0] # get closest elevation to select from LUT
-            DDA_elv_cry = DDA_wl_cry[DDA_wl_cry.elevation==el_close]
-            DDA_elv_cry = DDA_elv_cry[DDA_elv_cry.kdp<1]
-            #print(len(mcTableCry.sPhi),len(mcTableCry.sPhi)>0)
-            #print(len(mcTableAgg.mTot))
             if len(mcTableCry.sPhi)>0: # only possible if we have plate-like particles
-                if scatSet['mode'] == 'wobbling':
-                    pointsCry = np.array(list(zip(np.log10(DDA_elv_cry.Dmax), np.log10(DDA_elv_cry.mass), np.log10(DDA_elv_cry.ar),DDA_elv_cry.beta)))
-                    mcSnowPointsCry = np.array(list(zip(np.log10(mcTableCry.dia), np.log10(mcTableCry.mTot), np.log10(mcTableCry.sPhi),betas)))
-                elif scatSet['mode']== 'fixed_orientation':
-                    pointsCry = np.array(list(zip(np.log10(DDA_elv_cry.Dmax), np.log10(DDA_elv_cry.mass), np.log10(DDA_elv_cry.ar))))
-                    mcSnowPointsCry = np.array(list(zip(np.log10(mcTableCry.dia), np.log10(mcTableCry.mTot), np.log10(mcTableCry.sPhi))))
-            
-                # select now the points according to the defined method
-                # Fit the KNeighborsRegressor
-                if scatSet['selmode'] == 'KNeighborsRegressor':
-                    knn = neighbors.KNeighborsRegressor(scatSet['n_neighbors'],weights='distance')
+                if True:
+                    el_close = DDA_wl_cry.iloc[(DDA_wl_cry['elevation']-elv).abs().argsort()].elevation.values[0] # get closest elevation to select from LUT
+                    DDA_elv_cry = DDA_wl_cry[DDA_wl_cry.elevation==el_close]
+                    DDA_elv_cry = DDA_elv_cry[DDA_elv_cry.kdp<1]
+                    #print(len(mcTableCry.sPhi),len(mcTableCry.sPhi)>0)
+                    #print(len(mcTableAgg.mTot))
+                    if len(mcTableCry.sPhi)>0: # only possible if we have plate-like particles
+                        if scatSet['mode'] == 'wobbling':
+                            pointsCry = np.array(list(zip(np.log10(DDA_elv_cry.Dmax), np.log10(DDA_elv_cry.mass), np.log10(DDA_elv_cry.ar),DDA_elv_cry.beta)))
+                            mcSnowPointsCry = np.array(list(zip(np.log10(mcTableCry.dia), np.log10(mcTableCry.mTot), np.log10(mcTableCry.sPhi),betas)))
+                        elif scatSet['mode']== 'fixed_orientation':
+                            pointsCry = np.array(list(zip(np.log10(DDA_elv_cry.Dmax), np.log10(DDA_elv_cry.mass), np.log10(DDA_elv_cry.ar))))
+                            mcSnowPointsCry = np.array(list(zip(np.log10(mcTableCry.dia), np.log10(mcTableCry.mTot), np.log10(mcTableCry.sPhi))))
                     
-                    scatPoints = {'cbck_h':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Ze_h.values)).predict(mcSnowPointsCry)),#'Z11':10**knn.fit(pointsCry, np.log10(DDA_elv_cry.Z11.values)).predict(mcSnowPointsCry),
-                                    'cbck_v':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Ze_v.values)).predict(mcSnowPointsCry)),
-                                    'cbck_hv':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Ze_hv.values+abs(np.min(DDA_elv_cry.Ze_hv.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Ze_hv.values))-1,
-                                    'cext_h':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.cext_hh.values+2*abs(np.min(DDA_elv_cry.cext_hh.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.cext_hh.values)),
-                                    'cext_v':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.cext_vv.values+2*abs(np.min(DDA_elv_cry.cext_vv.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.cext_vv.values)),
-                                    'kdp':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.kdp.values+2*abs(np.min(DDA_elv_cry.kdp.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.kdp.values)),
-                                    }
-                
-                
-                mcTable['sZeH'].loc[elv,wl,mcTableCry.index] = scatPoints['cbck_h']
-                mcTable['sCextH'].loc[elv,wl,mcTableCry.index] = scatPoints['cext_h']
-                mcTable['sCextV'].loc[elv,wl,mcTableCry.index] = scatPoints['cext_v']
-                mcTable['sZeV'].loc[elv,wl,mcTableCry.index] = scatPoints['cbck_v']
-                mcTable['sZeHV'].loc[elv,wl,mcTableCry.index] = scatPoints['cbck_hv']
-                mcTable['sKDP'].loc[elv,wl,mcTableCry.index] = scatPoints['kdp']
-                
+                        # select now the points according to the defined method
+                        # Fit the KNeighborsRegressor
+                        if scatSet['selmode'] == 'KNeighborsRegressor':
+                            knn = neighbors.KNeighborsRegressor(scatSet['n_neighbors'],weights='distance')
+                            
+                            scatPoints = {'cbck_h':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Ze_h.values)).predict(mcSnowPointsCry)),#'Z11':10**knn.fit(pointsCry, np.log10(DDA_elv_cry.Z11.values)).predict(mcSnowPointsCry),
+                                            'cbck_v':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Ze_v.values)).predict(mcSnowPointsCry)),
+                                            'cbck_hv':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.Ze_hv.values+abs(np.min(DDA_elv_cry.Ze_hv.values))+1)).predict(mcSnowPointsCry))-abs(np.min(DDA_elv_cry.Ze_hv.values))-1,
+                                            'cext_h':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.cext_hh.values+2*abs(np.min(DDA_elv_cry.cext_hh.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.cext_hh.values)),
+                                            'cext_v':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.cext_vv.values+2*abs(np.min(DDA_elv_cry.cext_vv.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.cext_vv.values)),
+                                            'kdp':10**(knn.fit(pointsCry, np.log10(DDA_elv_cry.kdp.values+2*abs(np.min(DDA_elv_cry.kdp.values)))).predict(mcSnowPointsCry))-2*abs(np.min(DDA_elv_cry.kdp.values)),
+                                            }
+                        
+                        
+                        mcTable['sZeH'].loc[elv,wl,mcTableCry.index] = scatPoints['cbck_h']
+                        mcTable['sCextH'].loc[elv,wl,mcTableCry.index] = scatPoints['cext_h']
+                        mcTable['sCextV'].loc[elv,wl,mcTableCry.index] = scatPoints['cext_v']
+                        mcTable['sZeV'].loc[elv,wl,mcTableCry.index] = scatPoints['cbck_v']
+                        mcTable['sZeHV'].loc[elv,wl,mcTableCry.index] = scatPoints['cbck_hv']
+                        mcTable['sKDP'].loc[elv,wl,mcTableCry.index] = scatPoints['kdp']
+                else:
+                    start = time.time()
+                    target = dict(
+                            logmass     = np.log10(mcTableCry.mTot.values),
+                            logDmax     = np.log10(mcTableCry.dia.values),
+                            logar      = np.log10(mcTableCry.sPhi.values),
+                            elevation 	= np.ones(len(mcTableCry.mTot.values))*elv,
+                            wavelength  = np.ones(len(mcTableCry.mTot.values))*wl,
+                        )
+                    search_idx = search_ckdtree(treeCry, scalingCry, target)
+
+                    def scatLookup():
+                        variables = ('ZeH', 'CextH', 'CextV', 'ZeV', 'ZeHV', 'KDP')
+                        result = mcTableCry.sel(elevation=elv, wavelength=wl).get([f"s{_}" for _ in variables]).copy() # local slice that gets updated
+                        not_found_particles = []
+                        for isp, idx in enumerate((search_idx)):
+                        #for isp, idx in enumerate(tqdm(search_idx)):
+                            if len(idx) < 1:
+                                #raise ( ValueError(f'Could not find scattering props for aggregate: {elv=} {wl=} {mcTableAgg.isel(index=isp).get(["mTot","dia"]).to_dict()=}') )
+                                not_found_particles.append(isp)
+                                continue
+
+                            xi = int(mcTableCry.sMult[isp])
+
+                            # for now we accept all acceptable scattering aggregates with equal weight # what is happening here: randomly select particles out of candidates, maximal: xi, minimal: all candidates
+                            if True:
+                                # randomly take xi many out of candidates
+                                idx = np.random.choice(idx, min(len(idx), xi), replace=False)
+                            else:
+                                # we just take the first ones up to xi
+                                idx = idx[:xi]
+                            Ncandidates = len(idx)
+
+                            wgt = np.ones(Ncandidates) * xi / Ncandidates
+
+                            # normalize to make sure however many candidates we have, we end up with xi contribution
+                            wgt *= xi / np.sum(wgt) #2 * np.pi * xi / np.sum(wgt)
+
+                            for v in variables:
+                                result[f"s{v}"][isp] = np.sum(mcTableCry[v].data[idx] * wgt)
+
+                        return result, not_found_particles
+                    
+                    scat_cry, not_found_particles = scatLookup()
+                    
+                    if len(not_found_particles) > 1:
+                        print(f"Warning, we have {len(not_found_particles)} of {len(search_idx)} crystals that did not match the DDA scatter db")
+                        print(f"Missing mass: {float(mcTableCry.mTot.isel(index=not_found_particles).sum())} of {float(mcTableCry.mTot.sum())} ",
+                                f"({100*float(mcTableCry.mTot.isel(index=not_found_particles).sum()) / float(mcTableCry.mTot.sum())}%)")
+                    for k,v in scat_cry.data_vars.items():
+                        mcTable[k].loc[dict(elevation=elv, wavelength=wl, index=scat_cry.index)] = v
 
             
             if len(mcTableAgg.mTot)>0:
-                from tqdm import tqdm
-                import time
+                
                 start = time.time()
                 target = dict(
                         logmass     = np.log10(mcTableAgg.mTot.values),
                         logDmax     = np.log10(mcTableAgg.dia.values),
                         elevation 	= np.ones(len(mcTableAgg.mTot.values))*elv,
                         wavelength  = np.ones(len(mcTableAgg.mTot.values))*wl,
+                        habit       = mcTableAgg.habit_code.values,
                     )
-                search_idx = search_ckdtree(tree, scaling, target)
+                search_idx = search_ckdtree(treeAgg, scalingAgg, target)
 
 
                 if False:
@@ -206,7 +253,8 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                         variables = ('ZeH', 'CextH', 'CextV', 'ZeV', 'ZeHV', 'KDP')
                         result = mcTableAgg.sel(elevation=elv, wavelength=wl).get([f"s{_}" for _ in variables]).copy() # local slice that gets updated
                         not_found_particles = []
-                        for isp, idx in enumerate(tqdm(search_idx)):
+                        for isp, idx in enumerate((search_idx)):
+                        #for isp, idx in enumerate(tqdm(search_idx)):
                             if len(idx) < 1:
                                 #raise ( ValueError(f'Could not find scattering props for aggregate: {elv=} {wl=} {mcTableAgg.isel(index=isp).get(["mTot","dia"]).to_dict()=}') )
                                 not_found_particles.append(isp)
@@ -214,7 +262,7 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
 
                             xi = int(mcTableAgg.sMult[isp])
 
-                            # for now we accept all acceptable scattering aggregates with equal weight
+                            # for now we accept all acceptable scattering aggregates with equal weight # what is happening here: randomly select particles out of candidates, maximal: xi, minimal: all candidates
                             if True:
                                 # randomly take xi many out of candidates
                                 idx = np.random.choice(idx, min(len(idx), xi), replace=False)
@@ -226,7 +274,7 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                             wgt = np.ones(Ncandidates) * xi / Ncandidates
 
                             # normalize to make sure however many candidates we have, we end up with xi contribution
-                            wgt *= 2 * np.pi * xi / np.sum(wgt)
+                            wgt *= xi / np.sum(wgt) #2 * np.pi * xi / np.sum(wgt)
 
                             for v in variables:
                                 result[f"s{v}"][isp] = np.sum(DDA_data_agg[v].data[idx] * wgt)
@@ -234,16 +282,21 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                         return result, not_found_particles
 
                     scat_agg, not_found_particles = scatLookup()
-                    print(f"aggregate scattering lookup took {time.time() - start}s")
-
+                    #print(f"aggregate scattering lookup took {time.time() - start}s for len(search_idx)")
+                    
                     if len(not_found_particles) > 1:
-                        print(f"Warning, we have {len(not_found_particles)} of {len(search_idx)} sps that did not match the DDA scatter db")
+                        print(f"Warning, we have {len(not_found_particles)} of {len(search_idx)} aggs that did not match the DDA scatter db")
                         print(f"Missing mass: {float(mcTableAgg.mTot.isel(index=not_found_particles).sum())} of {float(mcTableAgg.mTot.sum())} ",
                                 f"({100*float(mcTableAgg.mTot.isel(index=not_found_particles).sum()) / float(mcTableAgg.mTot.sum())}%)")
-
+                    #print(mcTable)    
                     for k,v in scat_agg.data_vars.items():
+                        #print(k,v)
+                        if k == 'sZeV':
+                            k = 'sZeH'
+                        elif k == 'sZeH':
+                            k = 'sZeV'
                         mcTable[k].loc[dict(elevation=elv, wavelength=wl, index=scat_agg.index)] = v
-
+                    #quit()
 
 
             #plt.semilogx(mcTable.dia.loc[mcTableAgg.index], 10*np.log10(mcTable.sZeH.loc[elv,wl,mcTableAgg.index]),'.',label='cbck_h',ls='None',c='C1')
@@ -253,6 +306,7 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
 
     # We just need to make sure that now the multiplicity is one now, so that this particle is only taken once into account for spectrum.
     mcTable['sMult'].loc[dict(index=mcTableAgg.index)] = 1
+    mcTable['sMult'].loc[dict(index=mcTableCry.index)] = 1
 
     return mcTable
 
