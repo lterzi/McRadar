@@ -2,7 +2,7 @@
 # Licensed under a 3-clause BSD style license 
 
 
-import pandas as pd
+#import pandas as pd
 import numpy as np
 import xarray as xr
 
@@ -34,7 +34,7 @@ def getMcSnowTable(mcSnowPath):
     mcTable['mTot_g'] = mcTable['mTot'] * 1e3
     mcTable['dia_cm'] = mcTable['dia'] * 1e2
     if 'sPhi' not in mcTable:
-      mcTable['sPhi'] = 1.0 # simply add sPhi = 1
+        mcTable['sPhi'] = 1.0 # simply add sPhi = 1
     mcTable['sRho_tot_gcm'] = mcTable['sRho_tot']*1e-3 # in g/cm³
             
     #if 'sRho_tot' not in selMcTable:
@@ -127,35 +127,35 @@ def calcRho(mcTable):
 
 
 def creatRadarCols(mcTable, dicSettings):
-	"""
-	Create the Ze and KDP column
+    """
+    Create the Ze and KDP column
 
-	Parameters
-	----------
-	mcTable: output from getMcSnowTable()
-	wls: wavelenght (iterable) [mm]
+    Parameters
+    ----------
+    mcTable: output from getMcSnowTable()
+    wls: wavelenght (iterable) [mm]
 
-	Returns
-	-------
-	mcTable with a empty columns 'sZe*_*' 'sKDP_*' for 
-	storing Ze_H and Ze_V and sKDP of one particle of a 
-	given wavelength
-	"""
-	#print(mcTable)
-	mcTable['sZeH'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan#.assign_coords(elevation=dicSettings['elv'])
-	mcTable['sZeV'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
-	mcTable['sKDP'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
-	mcTable['sZeHV'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
-	mcTable['sZeMultH'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
-	mcTable['sZeMultV'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
-	mcTable['sKDPMult'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
-	mcTable['sZeMultHV'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
-	mcTable['sCextH'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
-	mcTable['sCextV'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
-	mcTable['sCextHMult'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
-	mcTable['sCextVMult'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
-	
-	return mcTable
+    Returns
+    -------
+    mcTable with a empty columns 'sZe*_*' 'sKDP_*' for 
+    storing Ze_H and Ze_V and sKDP of one particle of a 
+    given wavelength
+    """
+    #print(mcTable)
+    mcTable['sZeH'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan#.assign_coords(elevation=dicSettings['elv'])
+    mcTable['sZeV'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
+    mcTable['sKDP'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
+    mcTable['sZeHV'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
+    mcTable['sZeMultH'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
+    mcTable['sZeMultV'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
+    mcTable['sKDPMult'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
+    mcTable['sZeMultHV'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
+    mcTable['sCextH'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
+    mcTable['sCextV'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
+    mcTable['sCextHMult'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
+    mcTable['sCextVMult'] = mcTable.dia.expand_dims(dim={'elevation':dicSettings['elv'],'wavelength':dicSettings['wl']})*np.nan
+
+    return mcTable
 
     
 def calcRhophys(mcTable):

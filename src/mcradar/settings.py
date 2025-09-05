@@ -2,12 +2,12 @@
 # Licensed under a 3-clause BSD style license 
 
 import os
-from glob import glob
+#from glob import glob
 import numpy as np
 from scipy import constants
-import time
+#import time
 import pandas as pd
-import xarray as xr
+#import xarray as xr
 
 def loadSettings(PSD=False,dataPath=None,atmoFile=None, elv=90, nfft=512,
                  convolute=True,nave=np.array([10,20,28,90]),noise_pow=np.array([-50,-63,-58]),
@@ -19,9 +19,8 @@ def loadSettings(PSD=False,dataPath=None,atmoFile=None, elv=90, nfft=512,
                  heightRes=50, gridBaseArea=1,
                  attenuation=False,onlyIce=True,
                  beta=0,beta_std=0,
-                 scatSet={'mode':'DDA', 'selmode':'KNeighborsRegressor', 'n_neighbors':5, 'radius':1e-10,'K2':0.93}):
+                 scatSet={'mode':'fixed_orientation', 'selmode':'KNeighborsRegressor', 'n_neighbors':5, 'radius':1e-10,'K2':0.93}):
     
-   # TODO make eps_diss, wind and shear dependent on height (so an array with length of height). One idea: read in a file with height and eps_diss and then it can select the according eps_diss in full_radar that corresponds to the height. Or: already have eps_diss specified for all heights and just loop through it in fullRadar
     """
     This function defines the settings for starting the 
     calculation.
@@ -74,7 +73,7 @@ def loadSettings(PSD=False,dataPath=None,atmoFile=None, elv=90, nfft=512,
     for starting the caculations
     """
     if 'mode' not in scatSet.keys():
-      scatSet['mode'] = 'fixed_orientation'
+        scatSet['mode'] = 'fixed_orientation'
     if 'K2' not in scatSet.keys():
         scatSet['K2'] = 0.93
     if 'n_neighbors' not in scatSet.keys():
@@ -89,7 +88,7 @@ def loadSettings(PSD=False,dataPath=None,atmoFile=None, elv=90, nfft=512,
     if 'lutPath' not in scatSet.keys():
         raise FileNotFoundError('with this scattering mode ', scatSet['mode'], 'a valid path to the scattering LUT is required.')
         
-    elif not os.path.exists(scatSet['lutPath']):    
+    if not os.path.exists(scatSet['lutPath']):    
         raise FileNotFoundError(scatSet['lutPath'], 'is not valid, check your settings')
     if dataPath != None:
         

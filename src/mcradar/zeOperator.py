@@ -3,11 +3,11 @@
 
 import numpy as np
 import xarray as xr
-from scipy import constants
-from mcradar.tableOperator import creatRadarCols
-import warnings
-import matplotlib.pyplot as plt
-import time
+#from scipy import constants
+#from mcradar.tableOperator import creatRadarCols
+#import warnings
+#import matplotlib.pyplot as plt
+#import time
 from sklearn.neighbors import NearestNeighbors
 from sklearn import neighbors
 
@@ -69,7 +69,7 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
     Parameters
     ----------
     wls: wavelength [mm] (iterable)
-    elv: elevation angle [°] # TODO: maybe also this can become iterable
+    elvs: elevation angles [°] (iterable)
     mcTable: McSnow table returned from getMcSnowTable()
     scatSet: type of scattering calculations to use, choose between full and DDA
     orientational_avg: boolean to choose if the scattering properties are averaged over multiple orientations
@@ -80,15 +80,9 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
     mcTable including the horizontal and vertical reflectivity
     of each super particle calculated for X, Ka and W band. The
     calculation is made separetely for aspect ratio < 1 and >=1.
-    Kdp is also included. TODO spectral ldr and rho_hv
-    """
+    Kdp is also included. 
     
-    #calling the function to create output columns
-
-    
-    #if scatSet['mode'] == 'azimuthal_random_orientation':
-    """
-    #-- this option uses the output of the DDA calculations. 
+    this option uses the output of the DDA calculations. 
     We are reading in all data, then selecting the corresponding wl, elevation.
     Then, you can choose how you want your points selected out of the table. 
     We have the option to select the n closest neighbours and average over them, 
@@ -119,7 +113,7 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
     DDA_data_cry = DDA_data_cry.to_dataframe()
     DDA_data_agg = DDA_data_agg.to_dataframe()
     # generate points to look up in the DDA LUT
-    for i,wl in enumerate(wls):
+    for wl in wls:
         wl_close = DDA_data_agg.iloc[(DDA_data_agg['wavelength']-wl).abs().argsort()].wavelength.values[0] # get closest wavelength to select from LUT
         DDA_wl_agg = DDA_data_agg[DDA_data_agg.wavelength==wl_close]
 
@@ -331,14 +325,6 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                 mcTable['sKDP'].loc[elv,wl,mcTableAgg.index] = scatPoints['kdp']
                 mcTable['sCextH'].loc[elv,wl,mcTableAgg.index] = scatPoints['cext_h']
                 mcTable['sCextV'].loc[elv,wl,mcTableAgg.index] = scatPoints['cext_v']
-
-
-
-            
-
-
-   
-            
 
     return mcTable
 

@@ -8,20 +8,20 @@ from scipy import constants
 def getVelIntSpec(mcTable, mcTable_binned, variable):
     """
     Calculates the integrated reflectivity for each velocity bin
-    
+
     Parameters
     ----------
     mcTable: McSnow output returned from calcParticleZe()
     mcTable_binned: McSnow table output binned for a given velocity bin
     variable: name of column variable wich will be integrated over a velocity bin
-    
+
     Returns
     -------
     mcTableVelIntegrated: table with the integrated reflectivity for each velocity bin
     """
 
     mcTableVelIntegrated = mcTable.groupby(mcTable_binned)[variable].agg(['sum'])
-    
+
     return mcTableVelIntegrated
 
 
@@ -268,7 +268,7 @@ def convoluteSpec(spec,wl,vel,eps,noise_pow,nave,theta,u_wind,time_int,height,k_
     spectrum = convoluteNoise(spec_turb,vel,noise_pow,nave)
     
     if PSD == True:
-    	return spectrum, specBroad
+        return spectrum, specBroad
     else:
-    	return spectrum
+        return spectrum
     

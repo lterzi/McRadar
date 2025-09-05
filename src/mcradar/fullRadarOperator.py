@@ -5,12 +5,12 @@
 import numpy as np
 import xarray as xr
 from mcradar import *
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from mcradar.tableOperator import creatRadarCols
 import time
 import multiprocessing
-from multiprocessing import Process, Queue
-import sys
+#from multiprocessing import Process, Queue
+#import sys
 #if not sys.warnoptions: # bad form, would not recommend!
 #	import warnings
 #    warnings.simplefilter("ignore")
@@ -209,8 +209,8 @@ def singleParticleTrajectories(dicSettings, mcTable):
 	for i, pID in enumerate(np.unique(mcTable['sMult'].values)):
 
 		mcTableTmp = mcTable.where(mcTable.sMult==pID,drop=True)
-		mcTableCry = mcTable.where(mcTable['sNmono']==1,drop=True) # select only cry, only calculate that once!
-		mcTableAgg = mcTable.where(mcTable['sNmono']>1,drop=True)
+		mcTableCryTmp = mcTable.where(mcTable['sNmono']==1,drop=True) # select only cry, only calculate that once!
+		mcTableAggTmp = mcTable.where(mcTable['sNmono']>1,drop=True)
 		print(len(np.unique(mcTable['sMult'].values)),i)
 		mcTableTmp = calcParticleZe(dicSettings['wl'], dicSettings['elv'], mcTableTmp,mcTableAggTmp,mcTableCryTmp, dicSettings['scatSet'],dicSettings['beta'],dicSettings['beta_std'])
 		

@@ -8,14 +8,14 @@
 
 import numpy as np
 import mcradar as mcr
-from mcradar import *
+#from mcradar import *
 import pandas as pd
 import xarray as xr
 import plotting_functions as plot
 
 
 def str2bool(v):
-  return v.lower() in ("yes", "True", "t", "1","true")
+    return v.lower() in ("yes", "True", "t", "1","true")
 
 #- get all variables necessary to calculate scattering from environment
 allTimes=False
@@ -71,14 +71,14 @@ print('done with the calculations, now calculating moments from the spectra')
 output['Ze_H'] = output['spec_H'].sum(dim='vel')
 output['Ze_V'] = output['spec_V'].sum(dim='vel')
 if 'spec_H_Agg' in output:
-	output['Ze_H_Agg'] = output['spec_H_Agg'].sum(dim='vel')
-	output['Ze_V_Agg'] = output['spec_V_Agg'].sum(dim='vel')
-	output['ZDR_Agg'] = mcr.lin2db(output['Ze_H_Agg']/output['Ze_H_Agg'])
+    output['Ze_H_Agg'] = output['spec_H_Agg'].sum(dim='vel')
+    output['Ze_V_Agg'] = output['spec_V_Agg'].sum(dim='vel')
+    output['ZDR_Agg'] = mcr.lin2db(output['Ze_H_Agg']/output['Ze_H_Agg'])
 
 if 'spec_H_Mono' in output:
-	output['Ze_H_Mono'] = output['spec_H_Mono'].sum(dim='vel')
-	output['Ze_V_Mono'] = output['spec_V_Mono'].sum(dim='vel')
-	output['ZDR_Mono'] = mcr.lin2db(output['Ze_H_Mono']/output['Ze_H_Mono'])
+    output['Ze_H_Mono'] = output['spec_H_Mono'].sum(dim='vel')
+    output['Ze_V_Mono'] = output['spec_V_Mono'].sum(dim='vel')
+    output['ZDR_Mono'] = mcr.lin2db(output['Ze_H_Mono']/output['Ze_H_Mono'])
 
 output['ZDR'] = mcr.lin2db(output['Ze_H']/output['Ze_H'])
 output['Ze_HV'] = output['spec_HV'].sum(dim='vel')
