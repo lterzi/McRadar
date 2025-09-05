@@ -133,7 +133,7 @@ lutPath = '/project/meteo/work/L.Terzi/McRadarTest/LUT/' #'/work/lvonterz/SSRGA/
 velVec = np.loadtxt('/project/meteo/work/L.Terzi/McSnow_depogrowth_paper/dopplerVelocities_Wband_CEL.txt')
 #-- define range resolution 
 heightRes = 36
-outName = '9.6_35.5_94.0GHz_output_DDA_kdtree_with_habitcode_crystals_KDTree_new_30_90_oriavgTrue_beta0_beta_std0_convoluteTrue_attenuationFalse.nc'
+outName = '9.6_35.5_94.0GHz_output_DDA_kdtree_with_habitcode_30_90_oriavgTrue_beta0_beta_std0_convoluteTrue_attenuationFalse.nc'
 
 #inputPath = '/project/meteo/work/L.Terzi/McSnowoutput/habit/case_studies/20220206/NewAggs//1d_habit_habit1_IGF2_xi100_nz200_dtc5_fpm2_0_mult1_frag1_Dmode75_timeend36000_nh12000_nh26000_ncl75_nclmass4.8_nuclType1_at2_stick2_agggeo5_spkernsig0_ba500_domtop6000._atmo1_radiosondes_juelich_20220206_042141/'
 allPaths = [#'1d_habit1_xi016_nz250_lwc01_sat05_dt5_ncl42_rt2_habit1_agg1_AR00/',
@@ -236,5 +236,5 @@ for inputPath in allPaths:
 	output['sSNR_V'] = output['spec_V']/dicSettings['noise_pow']
 			
 	#-- now save it
-	output.to_netcdf(inputPath+outName)#inputPath+outName)
+	#output.to_netcdf(inputPath+outName)#inputPath+outName)
 	#singlePart.to_netcdf(inputPath+'test_singlescattering.nc')
