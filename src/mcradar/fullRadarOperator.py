@@ -307,7 +307,7 @@ def fullRadar(dicSettings, mcTable):
 						logDmax=abs(np.log10(1) - np.log10(1.05)), # 5 %
 						elevation = elevation_radius,
 						wavelength = 0.1,
-						habit = 7, # 10 % for habit code (which works because habit=0 for plates, so 0 tolerance, habit = 1 for dendrites, so 10% tolerance will not shift to other habit, only if habit = 20 or large, then 10% will be a int number)
+						#habit = 7, # 10 % for habit code (which works because habit=0 for plates, so 0 tolerance, habit = 1 for dendrites, so 10% tolerance will not shift to other habit, only if habit = 20 or large, then 10% will be a int number)
 						)
 	treeAgg, scalingAgg = gen_ckdtree(DDA_data_agg, search_radii)
 	

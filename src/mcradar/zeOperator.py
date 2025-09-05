@@ -217,7 +217,7 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                         logDmax     = np.log10(mcTableAgg.dia.values),
                         elevation 	= np.ones(len(mcTableAgg.mTot.values))*elv,
                         wavelength  = np.ones(len(mcTableAgg.mTot.values))*wl,
-                        habit       = mcTableAgg.habit_code.values,
+                        #habit       = mcTableAgg.habit_code.values,
                     )
                 search_idx = search_ckdtree(treeAgg, scalingAgg, target)
 
@@ -253,6 +253,8 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                         variables = ('ZeH', 'CextH', 'CextV', 'ZeV', 'ZeHV', 'KDP')
                         result = mcTableAgg.sel(elevation=elv, wavelength=wl).get([f"s{_}" for _ in variables]).copy() # local slice that gets updated
                         not_found_particles = []
+                        particles_smaller_smult = []
+                        particles_smaller_idx = []
                         for isp, idx in enumerate((search_idx)):
                         #for isp, idx in enumerate(tqdm(search_idx)):
                             if len(idx) < 1:
@@ -261,7 +263,11 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                                 continue
 
                             xi = int(mcTableAgg.sMult[isp])
-
+                            
+                            if len(idx) < xi:
+                                particles_smaller_smult.append(xi)
+                                particles_smaller_idx.append(len(idx))
+                                #print(len(idx),'<',xi,'for particle',isp,'sMult',mcTableAgg.sMult.isel(index=isp).values)
                             # for now we accept all acceptable scattering aggregates with equal weight # what is happening here: randomly select particles out of candidates, maximal: xi, minimal: all candidates
                             if True:
                                 # randomly take xi many out of candidates
@@ -279,9 +285,9 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                             for v in variables:
                                 result[f"s{v}"][isp] = np.sum(DDA_data_agg[v].data[idx] * wgt)
 
-                        return result, not_found_particles
+                        return result, not_found_particles, particles_smaller_smult, particles_smaller_idx
 
-                    scat_agg, not_found_particles = scatLookup()
+                    scat_agg, not_found_particles, particles_smaller_smult, particles_smaller_idx = scatLookup()
                     #print(f"aggregate scattering lookup took {time.time() - start}s for len(search_idx)")
                     
                     if len(not_found_particles) > 1:
@@ -289,6 +295,10 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,scatSet,beta,beta_st
                         print(f"Missing mass: {float(mcTableAgg.mTot.isel(index=not_found_particles).sum())} of {float(mcTableAgg.mTot.sum())} ",
                                 f"({100*float(mcTableAgg.mTot.isel(index=not_found_particles).sum()) / float(mcTableAgg.mTot.sum())}%)")
                     #print(mcTable)    
+                    if len(particles_smaller_smult) > 1:
+                        print(f"Warning, we have {len(particles_smaller_smult)} of {len(search_idx)} aggs that had less scatter db entries than sMult")
+                        print(f"min(sMult): {min(particles_smaller_smult)}, len(idx(min(sMult))): {particles_smaller_idx[np.argmin(particles_smaller_smult)]}")
+                        print(f"max(sMult): {max(particles_smaller_smult)}, len(idx(max(sMult))): {particles_smaller_idx[np.argmax(particles_smaller_smult)]}")
                     for k,v in scat_agg.data_vars.items():
                         #print(k,v)
                         if k == 'sZeV':
