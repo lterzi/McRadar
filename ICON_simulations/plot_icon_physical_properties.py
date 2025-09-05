@@ -70,28 +70,39 @@ ds = ds.rename({'addVar0001':'m_w','addVar0002':'m_i','addVar0003':'m_r',
                 'addVar0019':'pp','addVar0020':'dd'})
 
 idx = np.arange(ds.noParts.size); np.random.shuffle(idx); dss=ds.isel(noParts=idx[:int(1e6)])
-print(dss)
-for var in dss.data_vars:
-    print(var)
+# print(dss)
+# for var in dss.data_vars:
+#     print(var)
 
 dss['m_tot'] = dss.m_f+ dss.m_w+ dss.m_i+ dss.m_r # funktioniert nicht weil m_f,.. nicht defined
 dss['prolate_ratio'] = dss.pp / dss.mm # funktioniert nicht weil pp,... nicht defined
 
 fig,ax = plt.subplots(figsize=(15,6))
-dss.plot.scatter(ax=ax,x='x', y='altitude', hue='m_tot', s=10, cmap='Spectral_r',norm=matplotlib.colors.LogNorm(1e-12,1e-4))
+dss.plot.scatter(ax=ax,x='y', y='altitude', hue='m_tot', s=10, cmap='Spectral_r',norm=matplotlib.colors.LogNorm(1e-12,1e-4))
 plt.tight_layout()
-plt.savefig('m_tot.png')
+plt.savefig('m_tot_y.png')
 plt.close()
 fig,ax = plt.subplots(figsize=(15,6))
-dss.plot.scatter(ax=ax,x='x', y='altitude', hue='xi', s=10, cmap='Spectral_r', norm=matplotlib.colors.LogNorm(1e6,1e10))
+dss.plot.scatter(ax=ax,x='y', y='altitude', hue='xi', s=10, cmap='Spectral_r', norm=matplotlib.colors.LogNorm(1e6,1e10))
 plt.tight_layout()
-plt.savefig('xi.png')
+plt.savefig('xi_y.png')
 plt.close()
-dss.plot.scatter(x='x', y='altitude', hue='w_vel', s=10, cmap='Spectral_r')
+dss.plot.scatter(x='y', y='altitude', hue='w_vel', s=10, cmap='Spectral_r')
 plt.tight_layout()
-plt.savefig('w_vel.png')
+plt.savefig('w_vel_y.png')
 plt.close()
-dss.plot.scatter(x='x', y='altitude', hue='prolate_ratio', s=10, cmap='viridis')
+dss.plot.scatter(x='y', y='altitude', hue='prolate_ratio', s=10, cmap='viridis')
 plt.tight_layout()
-plt.savefig('prolate_ratio.png')
+plt.savefig('prolate_ratio_y.png')
 plt.close()
+
+
+# try to get plot of particles within one beam of radar. Lets assume radar is at x=-40000
+
+radarPosX = -40000; radarPosY = 100
+beamWidth = 0.6 # in degree
+beamWidthRad = np.deg2rad(beamWidth)
+maxRange = 11000 # in m
+
+# zenith view, cut beam out of data
+maxWidth = maxRange/np.tan(beamWidthRad/2)
