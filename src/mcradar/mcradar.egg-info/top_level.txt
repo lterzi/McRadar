@@ -1,8 +1,0 @@
-attenuationOperator
-fullRadarOperator
-kdpOperator
-settings
-spectraOperator
-tableOperator
-utilities
-zeOperator
