@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Licensed under a 3-clause BSD style license - see LICENSE.rst
+# Licensed under a 3-clause BSD style license 
 
 import os
 from glob import glob

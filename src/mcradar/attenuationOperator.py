@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# Licensed under a 3-clause BSD style license 
+# Author: Leonie von Terzi
+
 import subprocess
 import numpy as np
 import xarray as xr

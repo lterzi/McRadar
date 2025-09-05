@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# Licensed under a 3-clause BSD style license - see LICENSE.rst
-# Author: José Dias Neto
+# Licensed under a 3-clause BSD style license 
+# Author: Leonie von Terzi
 
 import numpy as np
 import xarray as xr

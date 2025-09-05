@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
-# Licensed under a 3-clause BSD style license - see LICENSE.rst
+# Licensed under a 3-clause BSD style license
 
-import subprocess
 import numpy as np
 import xarray as xr
-from glob import glob
 from scipy import constants
 from mcradar.tableOperator import creatRadarCols
 import warnings

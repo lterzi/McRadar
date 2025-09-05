@@ -9,7 +9,7 @@ description = "Radar forward operator for McSnow output using DDA scattering LUT
 readme = "README.md"
 authors = [{ name = "Leonie", email = "l.terzi@lmu.de" }]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: 3-clause BSD License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]

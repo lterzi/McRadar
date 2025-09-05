@@ -1,16 +1,10 @@
 # -*- coding: utf-8 -*-
-# Licensed under a 3-clause BSD style license - see LICENSE.rst
+# Licensed under a 3-clause BSD style license 
 
-import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import xarray as xr
-import mcradar as mcr
 import scipy.signal as sig
 from scipy import constants
-#from numba import jit
-import timeit
-#@jit(nopython=True)
 def getVelIntSpec(mcTable, mcTable_binned, variable):
     """
     Calculates the integrated reflectivity for each velocity bin
