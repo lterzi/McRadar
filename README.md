@@ -58,7 +58,8 @@ To find the scattering properties of a particle which best fits with its microph
 
 ## Publications related to McRadar:
 - DDA look-up tables can be found here: https://doi.org/10.5281/zenodo.16792943
+- More information can be found here: https://egusphere.copernicus.org/preprints/2025/egusphere-2025-3910/
   
 
 ## More information: 
-Please have a look at the examples provided in the examples folder. Further, this project will be published, and more information can be found in that publication. 
+Please have a look at the examples provided in the examples folder
