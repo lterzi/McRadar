@@ -15,10 +15,12 @@ from .attenuationOperator import getHydroAtmAtt
 
 from .fullRadarOperator import fullRadar
 from .fullRadarOperator import fullRadarParallel
+from .fullRadarOperator import fullRadarParallelNew
 
 from .fullRadarOperator import singleParticleTrajectories
 from .fullRadarOperator import singleParticleScat
 
 from .utilities import *
+
 
 
