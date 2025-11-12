@@ -10,7 +10,7 @@ import pandas as pd
 import xarray as xr
 
 def loadSettings(PSD=False,dataPath=None,atmoFile=None, elv=90, nfft=512,
-                 convolute=True,nave=np.array([10,20,28,90]),noise_pow=np.array([-50,-63,-58]),
+                 convolute=True,nave=np.array([20,20,20,90]),noise_pow=np.array([-50,-63,-58]), #nave=np.array([10,20,28,90])
                  theta=np.array([1.0,0.6,0.6]) , time_int=2.0 , tau=143*1e-9 ,
                  uwind=10.0, eps_diss=np.array([1e-6]), k_theta=np.array([0]),k_phi=np.array([0]),k_r=np.array([0]),shear_height0=0,shear_height1=0,
                  maxVel=3, minVel=-3,velVec=None,
@@ -20,7 +20,7 @@ def loadSettings(PSD=False,dataPath=None,atmoFile=None, elv=90, nfft=512,
                  attenuation=False,onlyIce=True,
                  beta=0,beta_std=0,
                  scatSet={'mode':'DDA', 'selmode':'KNeighborsRegressor', 'n_neighbors':5, 'radius':1e-10,
-                          'safeTmatrix':False,'K2':0.93,'orientational_avg':False}):
+                          'safeTmatrix':False,'K2':0.93,'orientational_avg':False, 'ice_core':True}):
     
    # TODO make eps_diss, wind and shear dependent on height (so an array with length of height). One idea: read in a file with height and eps_diss and then it can select the according eps_diss in full_radar that corresponds to the height. Or: already have eps_diss specified for all heights and just loop through it in fullRadar
     """
@@ -71,6 +71,7 @@ def loadSettings(PSD=False,dataPath=None,atmoFile=None, elv=90, nfft=512,
     scatSet['radius']: radius in which the nearest neighbours are selected when scatSet['selmode'] is set to radius.
     scatSet['lutPath']: path to where the DDA calculations are stored. This is only needed when scatSet['mode'] is set to DDA.
     scatSet['ndgs']: number of division points used to integrate over the particle surface (default = 30) when using Tmatrix as scattering mode
+    scatSet['ice_core']: if True, the ice core and water coating is used for melted particles, if False water core and ice coating is used. Default: True
     Returns
     -------
     dicSettings: dictionary with all parameters
@@ -92,6 +93,8 @@ def loadSettings(PSD=False,dataPath=None,atmoFile=None, elv=90, nfft=512,
         scatSet['selmode'] = 'KNeighborsRegressor'
     if 'orientational_avg' not in scatSet.keys():
         scatSet['orientational_avg'] = False
+    if 'ice_core' not in scatSet.keys():
+        scatSet['ice_core'] = True
 
     if dataPath != None:
         
