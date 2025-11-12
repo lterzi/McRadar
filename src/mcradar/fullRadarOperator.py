@@ -31,27 +31,37 @@ def gen_ckdtree(aggdb, search_radii):
     print(f"construction of ckdtree took {end - start}s")
     return tree, scaling
 
-def getRadarParParallel(heightEdge0,mcTable,mcTableAgg,mcTableCry,dicSettings,treeAgg,scalingAgg,treeCry,scalingCry,DDA_data_agg,DDA_data_cry):#heightRes,wl,elv,ndgsVal,scatSet,velBins,velCenterBin,convolute,nave,noise_pow,eps_diss,uwind,time_int,theta,tau):
-	vol = dicSettings['gridBaseArea'] * dicSettings['heightRes']
+def getRadarParParallel(heightEdge0,mcTable,mcTableAgg,mcTableCry,mcTableFrozen,mcTableMelted,dicSettings,treeAgg,scalingAgg,treeCry,scalingCry,DDA_data_agg,DDA_data_cry):#heightRes,wl,elv,ndgsVal,scatSet,velBins,velCenterBin,convolute,nave,noise_pow,eps_diss,uwind,time_int,theta,tau):
+	if len(dicSettings['gridBaseArea']) > 1:
+			vol = dicSettings['gridBaseArea'][i] * dicSettings['heightRes']
+	else:
+		vol = dicSettings['gridBaseArea'] * dicSettings['heightRes']
 	heightEdge1 = heightEdge0 + dicSettings['heightRes']
 
 	print('Range: from {0} to {1}'.format(heightEdge0, heightEdge1))
-	mcTableAggTmp = mcTableAgg.where((mcTableAgg['sHeight']>heightEdge0) &
-			 					(mcTableAgg['sHeight']<=heightEdge1),drop=True)
-	mcTableCryTmp = mcTableCry.where((mcTableCry['sHeight']>heightEdge0) &
-			 					(mcTableCry['sHeight']<=heightEdge1),drop=True)
 	mcTableTmp = mcTable.where((mcTable['sHeight']>heightEdge0) &
-			 					(mcTable['sHeight']<=heightEdge1),drop=True)
+				 					(mcTable['sHeight']<=heightEdge1),drop=True)
+	
 	if mcTableTmp.vel.any():
+		mcTableAggTmp = mcTableAgg.where((mcTableAgg['sHeight']>heightEdge0) &
+							(mcTableAgg['sHeight']<=heightEdge1),drop=True)
+		mcTableCryTmp = mcTableCry.where((mcTableCry['sHeight']>heightEdge0) &
+								(mcTableCry['sHeight']<=heightEdge1),drop=True)
+		mcTableFrozenTmp = mcTableFrozen.where((mcTableFrozen['sHeight']>heightEdge0) &
+								(mcTableFrozen['sHeight']<=heightEdge1),drop=True)
+		mcTableMeltedTmp = mcTableMelted.where((mcTableMelted['sHeight']>heightEdge0) &
+								(mcTableMelted['sHeight']<=heightEdge1),drop=True)
+		mcTableLiquidTmp = mcTableLiquid.where((mcTableLiquid['sHeight']>heightEdge0) &
+								(mcTableLiquid['sHeight']<=heightEdge1),drop=True)
 		#- get the scattering properties for each particle, we have separate tables for aggregates and crystals
-		mcTableTmp = calcParticleZe(dicSettings['wl'], dicSettings['elv'], mcTableTmp,mcTableAggTmp,mcTableCryTmp, dicSettings['scatSet'],dicSettings['beta'],dicSettings['beta_std'],
-							  treeAgg,scalingAgg,treeCry,scalingCry,DDA_data_agg,DDA_data_cry)#,height=(heightEdge1+heightEdge0)/2)
-			#- get the spectra, there is the possibility to add shear, but I have not implemented it yet
+		mcTableTmp = calcParticleZe(dicSettings['wl'], dicSettings['elv'], mcTableTmp,mcTableAggTmp,mcTableCryTmp,mcTableFrozenTmp,mcTableMeltedTmp,mcTableLiquidTmp,
+							   dicSettings['scatSet'],dicSettings['beta'],dicSettings['beta_std'],treeAgg,scalingAgg,treeCry,scalingCry,DDA_data_agg,DDA_data_cry, ice_core=dicSettings['scatSet']['ice_core'])#,height=(heightEdge1+heightEdge0)/2)
+		#- get the spectra, there is the possibility to add shear, but I have not implemented it yet
 		k_theta, k_phi, k_r = 0,0,0
 		tmpSpecXR = getMultFrecSpec(dicSettings['wl'], dicSettings['elv'],mcTableTmp, dicSettings['velBins'],
-										dicSettings['velCenterBin'], (heightEdge1+heightEdge0)/2,dicSettings['convolute'],dicSettings['nave'],dicSettings['noise_pow'],
-										dicSettings['eps_diss'], dicSettings['uwind'],dicSettings['time_int'], dicSettings['theta']/2./180.*np.pi,
-										k_theta,k_phi,k_r, dicSettings['tau'])
+									dicSettings['velCenterBin'], (heightEdge1+heightEdge0)/2,dicSettings['convolute'],dicSettings['nave'],dicSettings['noise_pow'],
+									dicSettings['eps_diss'], dicSettings['uwind'],dicSettings['time_int'], dicSettings['theta']/2./180.*np.pi,
+									k_theta,k_phi,k_r, dicSettings['tau'])
 		tmpSpecXR = tmpSpecXR/vol
 		tmpKdpXR =  getIntKdp(mcTableTmp,(heightEdge1+heightEdge0)/2)
 		tmpSpecXR = xr.merge([tmpSpecXR, tmpKdpXR/vol])
@@ -94,99 +104,48 @@ def fullRadarParallel(dicSettings, mcTable):
 	"""
 
 
-	specXR = xr.Dataset()
-	#specXR_turb = xr.Dataset()
-	vol = dicSettings['gridBaseArea'] * dicSettings['heightRes']
 	mcTable = creatRadarCols(mcTable, dicSettings)
 	t0 = time.time()
 	att_atm0 = 0.; att_ice_HH0=0.; att_ice_VV0=0.
-	mcTableCry = mcTable.where(mcTable['sNmono']==1,drop=True) # select only cry, only calculate that once!
-	mcTableAgg = mcTable.where(mcTable['sNmono']>1,drop=True) # select only aggregates
-	DDA_data_agg = xr.open_dataset(dicSettings['scatSet']['lutPath']+'stochastic_aggregates.nc')
+	DDA_data_agg = xr.open_dataset(dicSettings['scatSet']['lutPath']+'all_aggregates_small_kdp.nc')
 	DDA_data_agg['logmass'] = np.log10(DDA_data_agg.mass)
 	DDA_data_agg['logDmax'] = np.log10(DDA_data_agg.Dmax)
 	DDA_data_cry = xr.open_dataset(dicSettings['scatSet']['lutPath']+'all_crystals_allazi_withradar.nc')
 	DDA_data_cry['logmass'] = np.log10(DDA_data_cry.mass)
 	DDA_data_cry['logDmax'] = np.log10(DDA_data_cry.Dmax)
 	DDA_data_cry['logar'] = np.log10(DDA_data_cry.aspect_ratio)
-	
-	# define habit codes to be consistent with the codes of the DDA_data_agg database:
-	ratioPN = np.round(((mcTableAgg.sNmono - mcTableAgg['sp%pp'])/mcTableAgg.sNmono).values,1)*10+20 # ratio of plates and needles
-	ratioPN = np.where(ratioPN==20, 21, ratioPN)
-	ratioPN = np.where(ratioPN==22, 23, ratioPN)
-	ratioPN = np.where(ratioPN==24, 25, ratioPN)
-	ratioPN = np.where(ratioPN==26, 27, ratioPN)
-	ratioPN = np.where(ratioPN==28, 29, ratioPN)
-	ratioDN = np.round(((mcTableAgg.sNmono - mcTableAgg['sp%dd'])/mcTableAgg.sNmono).values,1)*10+30 # ratio of dendrites and needles
-	ratioDN = np.where(ratioDN==30, 31, ratioDN)
-	ratioDN = np.where(ratioDN==32, 33, ratioDN)
-	ratioDN = np.where(ratioDN==34, 35, ratioDN)
-	ratioDN = np.where(ratioDN==36, 37, ratioDN)
-	ratioDN = np.where(ratioDN==38, 39, ratioDN)
-	ratioPD = np.round(((mcTableAgg.sNmono - mcTableAgg['sp%pp'])/mcTableAgg.sNmono).values,1)*10+40 # ratio of plates and dendrites
-	ratioPD = np.where(ratioPD==40, 41, ratioPD)
-	ratioPD = np.where(ratioPD==42, 43, ratioPD)
-	ratioPD = np.where(ratioPD==44, 45, ratioPD)
-	ratioPD = np.where(ratioPD==46, 47, ratioPD)
-	ratioPD = np.where(ratioPD==48, 49, ratioPD)
-	#ratioPND = 
 
-	#TODO: add mix of plate, dendrite and needle! OR: look at the 25% that were not defined! So filter by that 25%!!
-	# define condition for plates and dendrites:
-	condPD = (mcTableAgg['sp%pp'] + mcTableAgg['sp%dd']) == mcTableAgg.sNmono
-	# define condition for plate and needle:
-	condPN = (mcTableAgg['sp%dd'] == 0) & (mcTableAgg['sp%pp'] > 0) & (mcTableAgg.sNmono > mcTableAgg['sp%pp'])
-	# define condition for dendrite and needle: 
-	condDN = (mcTableAgg['sp%pp'] == 0) & (mcTableAgg['sp%dd'] > 0) & (mcTableAgg.sNmono > mcTableAgg['sp%dd'])
-	# define condition for needle:
-	condN = (mcTableAgg['sp%pp'] + mcTableAgg['sp%dd']) == 0
-	# define condition for plates:
-	condP  = mcTableAgg['sp%pp'] == mcTableAgg.sNmono
-	# define dendrites:
-	condD = mcTableAgg['sp%dd'] == mcTableAgg.sNmono
-	# define PND aggregate:
-	condPND = (mcTableAgg['sp%dd'] > 0) & (mcTableAgg['sp%pp'] > 0) & (mcTableAgg.sNmono > (mcTableAgg['sp%pp'] + mcTableAgg['sp%dd']))
-
-	mcTableAgg['habit_code'] = mcTableAgg.sNmono.copy()*0
-	habit_code = mcTableAgg.habit_code
-	habit_code = xr.where(condDN, ratioDN, habit_code)
-	habit_code = xr.where(condPN, ratioPN, habit_code)
-	habit_code = xr.where(condPD, ratioPD, habit_code)
-	habit_code = xr.where(condP, 40, habit_code) # todo: put that back into 2!!!, for now only because we have many plate-dendrite aggregates and barely any for forward simulation!
-	habit_code = xr.where(condD, 2, habit_code)
-	habit_code = xr.where(condN,1,habit_code)
-	habit_code = xr.where(condPND, 45, habit_code) # for now have plate, needle dendrite aggregate be described as plate dendrite aggregate with 50,50
-	mcTableAgg['habit_code'] = habit_code
-	
-	DDA_data_agg['habit'] = xr.where(DDA_data_agg.habit == 0, 40, DDA_data_agg.habit) # TODO: return that to 0!
-	
+	# separate into species;
+	mcTableAgg, mcTableCry, mcTableFrozen, mcTableMelted, mcTableLiquid = prepare_mcTable(mcTable,dicSettings)
 	if dicSettings['beta_std'] == 0:
 		elevation_radius = 1
 	else:
 		elevation_radius = dicSettings['beta']
-	search_radii_agg = dict(
+	search_radii = dict(
 						logmass=abs(np.log10(1) - np.log10(1.05)), # 2 %
 						logDmax=abs(np.log10(1) - np.log10(1.05)), # 5 %
 						elevation = elevation_radius,
 						wavelength = 0.1,
-						habit = 7, # 10 % for habit code (which works because habit=0 for plates, so 0 tolerance, habit = 1 for dendrites, so 10% tolerance will not shift to other habit, only if habit = 20 or large, then 10% will be a int number)
+						#habit = 7, # 10 % for habit code (which works because habit=0 for plates, so 0 tolerance, habit = 1 for dendrites, so 10% tolerance will not shift to other habit, only if habit = 20 or large, then 10% will be a int number)
 						)
-	treeAgg, scalingAgg = gen_ckdtree(DDA_data_agg, search_radii_agg)
+	print(DDA_data_agg, search_radii)
+	treeAgg, scalingAgg = gen_ckdtree(DDA_data_agg, search_radii)
 	
-	search_radii_cry = dict(
-						logmass=abs(np.log10(1) - np.log10(1.05)), # 2 %
-						logDmax=abs(np.log10(1) - np.log10(1.05)), # 5 %
-						logar = abs(np.log10(1) - np.log10(1.05)), # 2 %
+	search_radii = dict(
+						logmass=abs(np.log10(1) - np.log10(1.1)), # 2 %
+						logDmax=abs(np.log10(1) - np.log10(1.1)), # 5 %
+						logar = abs(np.log10(1) - np.log10(1.1)), # 2 %
 						elevation = elevation_radius,
 						wavelength = 0.1,
 						)
-	treeCry, scalingCry = gen_ckdtree(DDA_data_cry, search_radii_cry)
+	treeCry, scalingCry = gen_ckdtree(DDA_data_cry, search_radii)
+
 	t0 = time.time()
-	n_cores = 4#multiprocessing.cpu_count()
+	n_cores = 8#multiprocessing.cpu_count()
 	print(n_cores)
 	pool = multiprocessing.Pool(n_cores)
 
-	args = [(h, mcTable,mcTableAgg,mcTableCry, dicSettings,treeAgg,scalingAgg,treeCry,scalingCry,DDA_data_agg,DDA_data_cry) for h in dicSettings['heightRange']]
+	args = [(h, mcTable,mcTableAgg,mcTableCry,mcTableFrozen,mcTableMelted, dicSettings,treeAgg,scalingAgg,treeCry,scalingCry,DDA_data_agg,DDA_data_cry) for h in dicSettings['heightRange']]
 
 	result =  pool.starmap(getRadarParParallel,args)
 	result = [x for x in result if x is not None]
@@ -198,7 +157,173 @@ def fullRadarParallel(dicSettings, mcTable):
 	
 	return specXR
 
+def fullRadarParallelNew(dicSettings, mcTable):
+	"""
+	Calculates the radar variables over the entire range
 
+	Parameters
+	----------
+	dicSettings: a dictionary with all settings output from loadSettings()
+	mcTable: McSnow data output from getMcSnowTable()
+
+	Returns
+	-------
+	specXR: xarray dataset with the spectra(range, vel) and KDP(range)
+	"""
+
+	import concurrent.futures
+	mcTable = creatRadarCols(mcTable, dicSettings)
+	t0 = time.time()
+	att_atm0 = 0.; att_ice_HH0=0.; att_ice_VV0=0.
+	DDA_data_agg = xr.open_dataset(dicSettings['scatSet']['lutPath']+'all_aggregates_small_kdp.nc')
+	DDA_data_agg['logmass'] = np.log10(DDA_data_agg.mass)
+	DDA_data_agg['logDmax'] = np.log10(DDA_data_agg.Dmax)
+	DDA_data_cry = xr.open_dataset(dicSettings['scatSet']['lutPath']+'all_crystals_allazi_withradar.nc')
+	DDA_data_cry['logmass'] = np.log10(DDA_data_cry.mass)
+	DDA_data_cry['logDmax'] = np.log10(DDA_data_cry.Dmax)
+	DDA_data_cry['logar'] = np.log10(DDA_data_cry.aspect_ratio)
+
+	# separate into species;
+	mcTableAgg, mcTableCry, mcTableFrozen, mcTableMelted, mcTableLiquid = prepare_mcTable(mcTable,dicSettings)
+	if dicSettings['beta_std'] == 0:
+		elevation_radius = 1
+	else:
+		elevation_radius = dicSettings['beta']
+	search_radii = dict(
+						logmass=abs(np.log10(1) - np.log10(1.05)), # 2 %
+						logDmax=abs(np.log10(1) - np.log10(1.05)), # 5 %
+						elevation = elevation_radius,
+						wavelength = 0.1,
+						#habit = 7, # 10 % for habit code (which works because habit=0 for plates, so 0 tolerance, habit = 1 for dendrites, so 10% tolerance will not shift to other habit, only if habit = 20 or large, then 10% will be a int number)
+						)
+	print(DDA_data_agg, search_radii)
+	treeAgg, scalingAgg = gen_ckdtree(DDA_data_agg, search_radii)
+	
+	search_radii = dict(
+						logmass=abs(np.log10(1) - np.log10(1.1)), # 2 %
+						logDmax=abs(np.log10(1) - np.log10(1.1)), # 5 %
+						logar = abs(np.log10(1) - np.log10(1.1)), # 2 %
+						elevation = elevation_radius,
+						wavelength = 0.1,
+						)
+	treeCry, scalingCry = gen_ckdtree(DDA_data_cry, search_radii)
+
+	t0 = time.time()
+	n_cores = 8#multiprocessing.cpu_count()
+	print(n_cores)
+	with concurrent.futures.ProcessPoolExecutor(max_workers=n_cores) as executor:
+		future = []
+		for h in dicSettings['heightRange']:
+			#print(Dx.values)
+			future.append(executor.submit(getRadarParParallel, heightEdge0=h,mcTable=mcTable,mcTableAgg=mcTableAgg,
+																mcTableCry=mcTableCry,mcTableFrozen=mcTableFrozen,
+																mcTableMelted=mcTableMelted,dicSettings=dicSettings,
+																treeAgg=treeAgg,scalingAgg=scalingAgg,treeCry=treeCry,
+																scalingCry=scalingCry,DDA_data_agg=DDA_data_agg,
+																DDA_data_cry=DDA_data_cry))#,
+	print("multithreads done in {} seconds".format(time.time()-t0))
+	results = [i.result() for i in future]
+	specXR = xr.merge(results)
+	
+	if debugging:
+		print('total time with parallelizing for all heights was', time.time()-t0)
+	
+	return specXR
+
+
+def prepare_mcTable(mcTable,dicSettings):
+	"""
+	Here I am outsourcing the calculations of the different particle species
+	"""
+	if 'm_f' not in mcTable:
+		mcTable['m_f'] = mcTable.mTot.copy()*0
+	mcTable['frozen_fraction'] = mcTable['m_f']/mcTable.mTot
+	if 'm_w' not in mcTable and 'm_r' not in mcTable and 'm_i' not in mcTable:
+		mcTable['m_w'] = mcTable.mTot.copy()*0
+		mcTable['m_r'] = mcTable.mTot.copy()*0
+		mcTable['m_i'] = mcTable.mTot.copy()*0
+		mcTable['mass_all_ice'] = mcTable.mTot# mcTable.m_i + mcTable.m_f + mcTable.m_r
+	else:
+		mcTable['mass_all_ice'] = mcTable.m_i + mcTable.m_f + mcTable.m_r
+
+	# define liquid particles
+	liquid_particles = (mcTable.m_w > 0) & (mcTable.mass_all_ice == 0)
+	mcTableLiquid = mcTable.where(liquid_particles, drop=True) # remove particles with liquid water present
+	
+	# define melted particles:
+	# for now melted particles are spheres with ice core and water coating, if changed to water core and ice coating, need to change code here
+	melted_particle = (mcTable.m_w > 0) & (mcTable.mass_all_ice > 0)
+	mcTableMelted = mcTable.where(melted_particle, drop=True) # select only melted particles
+	rho_w = 1000
+	rho_ice = 917
+	
+	if dicSettings['scatSet']['ice_core']==True:
+		density_ice_core = 3*mcTableMelted.mass_all_ice/(4*np.pi*((mcTableMelted.dia/2)**3-3*mcTableMelted.m_w/(4*np.pi*rho_w))) # calculate reqiured ice density to reach Dmax from ICON
+		mcTableMelted['rho_ice_core'] = density_ice_core
+		mcTableMelted['dia_ice_core'] = (3*mcTableMelted.mass_all_ice/(rho_ice*4*np.pi))**(1/3)*2
+		mcTableMelted['dia_water_cover'] = mcTableMelted.dia - mcTableMelted.dia_ice_core
+	else:
+		density_ice_core = 3*mcTableMelted.mass_all_ice/(4*np.pi*((mcTableMelted.dia/2)**3-3*mcTableMelted.m_w/(4*np.pi*rho_w))) # calculate reqiured ice density to reach Dmax from ICON
+		mcTableMelted['rho_ice_coat'] = density_ice_core
+		mcTableMelted['dia_water_core'] = (3*mcTableMelted.m_w/(4*np.pi*rho_w))**(1/3)*2
+		mcTableMelted['dia_ice_coat'] = mcTableMelted.dia - mcTableMelted.dia_water_core
+
+	mcTableIce = mcTable.where(mcTable.m_w ==0, drop=True) # remove particles with liquid water present
+	mcTableFrozen = mcTableIce.where(mcTableIce['frozen_fraction']>1,drop=True)
+	mcTableUnfrozen = mcTableIce.where(mcTableIce['frozen_fraction']<=1,drop=True)
+	mcTableCry = mcTableUnfrozen.where(mcTableIce['sNmono']==1,drop=True) # select only cry, only calculate that once!
+	mcTableAgg = mcTableUnfrozen.where(mcTableIce['sNmono']>1,drop=True) # select only aggregates
+	
+	# define habit codes to be consistent with the codes of the DDA_data_agg database:
+	
+	# ratioPN = np.round(((mcTableAgg.sNmono - mcTableAgg['sp%pp'])/mcTableAgg.sNmono).values,1)*10+20 # ratio of plates and needles
+	# ratioPN = np.where(ratioPN==20, 21, ratioPN)
+	# ratioPN = np.where(ratioPN==22, 23, ratioPN)
+	# ratioPN = np.where(ratioPN==24, 25, ratioPN)
+	# ratioPN = np.where(ratioPN==26, 27, ratioPN)
+	# ratioPN = np.where(ratioPN==28, 29, ratioPN)
+	# ratioDN = np.round(((mcTableAgg.sNmono - mcTableAgg['sp%dd'])/mcTableAgg.sNmono).values,1)*10+30 # ratio of dendrites and needles
+	# ratioDN = np.where(ratioDN==30, 31, ratioDN)
+	# ratioDN = np.where(ratioDN==32, 33, ratioDN)
+	# ratioDN = np.where(ratioDN==34, 35, ratioDN)
+	# ratioDN = np.where(ratioDN==36, 37, ratioDN)
+	# ratioDN = np.where(ratioDN==38, 39, ratioDN)
+	# ratioPD = np.round(((mcTableAgg.sNmono - mcTableAgg['sp%pp'])/mcTableAgg.sNmono).values,1)*10+40 # ratio of plates and dendrites
+	# ratioPD = np.where(ratioPD==40, 41, ratioPD)
+	# ratioPD = np.where(ratioPD==42, 43, ratioPD)
+	# ratioPD = np.where(ratioPD==44, 45, ratioPD)
+	# ratioPD = np.where(ratioPD==46, 47, ratioPD)
+	# ratioPD = np.where(ratioPD==48, 49, ratioPD)
+
+	# # define condition for plates and dendrites:
+	# condPD = mcTableAgg['sp%pp'] + mcTableAgg['sp%dd'] == mcTableAgg.sNmono
+	# # define condition for plate and needle:
+	# condPN = (mcTableAgg['sp%dd'] == 0) & (mcTableAgg['sp%pp'] > 0) & (mcTableAgg.sNmono > mcTableAgg['sp%pp'])
+	# # define condition for dendrite and needle: 
+	# condDN = (mcTableAgg['sp%pp'] == 0) & (mcTableAgg['sp%dd'] > 0) & (mcTableAgg.sNmono > mcTableAgg['sp%dd'])
+	# # define condition for needle:
+	# condN = mcTableAgg['sp%pp'] + mcTableAgg['sp%dd'] == 0
+	# # define condition for plates:
+	# condP  = mcTableAgg['sp%pp'] == mcTableAgg.sNmono
+	# #plates = mcTableAgg.where(mcTableAgg['sp%pp'] == mcTableAgg.sNmono,drop=True)
+	# # define dendrites:
+	# condD = mcTableAgg['sp%dd'] == mcTableAgg.sNmono
+	
+	mcTableAgg['habit_code'] = mcTableAgg.sNmono.copy()*0
+	# habit_code = mcTableAgg.habit_code
+	# habit_code = xr.where(condDN, ratioDN, habit_code)
+	# habit_code = xr.where(condPN, ratioPN, habit_code)
+	# habit_code = xr.where(condPD, ratioPD, habit_code)
+	# habit_code = xr.where(condP, 0, habit_code)
+	# habit_code = xr.where(condD, 2, habit_code)
+	# habit_code = xr.where(condN,1,habit_code)
+	# mcTableAgg['habit_code'] = mcTableAgg.habit_code.where(np.logical_not(condDN), ratioDN)#, mcTable['habit_code'])
+	# mcTableAgg['habit_code'] = mcTableAgg.habit_code.where(np.logical_not(condPN), ratioPN)#, mcTable['habit_code'])
+	# mcTableAgg['habit_code'] = mcTableAgg.habit_code.where(np.logical_not(mcTableAgg['sp%pp'] + mcTableAgg['sp%dd'] == mcTableAgg.sNmono), ratioPD)#, mcTable['habit_code'])
+	# mcTableAgg['habit_code'] = mcTableAgg.habit_code.where(np.logical_not(mcTableAgg['sp%pp'] == mcTableAgg.sNmono), 0)#, mcTable['habit_code'])
+	# mcTableAgg['habit_code'] = mcTableAgg.habit_code.where(np.logical_not(mcTableAgg['sp%dd'] == mcTableAgg.sNmono), 2)#, mcTable['habit_code'])
+	# mcTableAgg['habit_code'] = mcTableAgg.habit_code.where(np.logical_not(mcTableAgg['sp%pp'] + mcTableAgg['sp%dd'] == 0), 1)#, mcTable['habit_code'])
+	return mcTableAgg, mcTableCry, mcTableFrozen, mcTableMelted, mcTableLiquid
 
 def fullRadar(dicSettings, mcTable):
 	"""
@@ -217,69 +342,20 @@ def fullRadar(dicSettings, mcTable):
 
 	specXR = xr.Dataset()
 	#specXR_turb = xr.Dataset()
-	vol = dicSettings['gridBaseArea'] * dicSettings['heightRes']
+	
 	mcTable = creatRadarCols(mcTable, dicSettings)
 	t0 = time.time()
 	att_atm0 = 0.; att_ice_HH0=0.; att_ice_VV0=0.
-	mcTableCry = mcTable.where(mcTable['sNmono']==1,drop=True) # select only cry, only calculate that once!
-	mcTableAgg = mcTable.where(mcTable['sNmono']>1,drop=True) # select only aggregates
-	DDA_data_agg = xr.open_dataset(dicSettings['scatSet']['lutPath']+'stochastic_aggregates.nc')
+	DDA_data_agg = xr.open_dataset(dicSettings['scatSet']['lutPath']+'all_aggregates_small_kdp.nc')
 	DDA_data_agg['logmass'] = np.log10(DDA_data_agg.mass)
 	DDA_data_agg['logDmax'] = np.log10(DDA_data_agg.Dmax)
-	DDA_data_cry = xr.open_dataset(dicSettings['scatSet']['lutPath']+'all_crystals_allazi_withradar.nc')
+	DDA_data_cry = xr.open_dataset(dicSettings['scatSet']['lutPath']+'stochastic_crystals.nc')
 	DDA_data_cry['logmass'] = np.log10(DDA_data_cry.mass)
 	DDA_data_cry['logDmax'] = np.log10(DDA_data_cry.Dmax)
 	DDA_data_cry['logar'] = np.log10(DDA_data_cry.aspect_ratio)
-	
-	# define habit codes to be consistent with the codes of the DDA_data_agg database:
-	
-	ratioPN = np.round(((mcTableAgg.sNmono - mcTableAgg['sp%pp'])/mcTableAgg.sNmono).values,1)*10+20 # ratio of plates and needles
-	ratioPN = np.where(ratioPN==20, 21, ratioPN)
-	ratioPN = np.where(ratioPN==22, 23, ratioPN)
-	ratioPN = np.where(ratioPN==24, 25, ratioPN)
-	ratioPN = np.where(ratioPN==26, 27, ratioPN)
-	ratioPN = np.where(ratioPN==28, 29, ratioPN)
-	ratioDN = np.round(((mcTableAgg.sNmono - mcTableAgg['sp%dd'])/mcTableAgg.sNmono).values,1)*10+30 # ratio of dendrites and needles
-	ratioDN = np.where(ratioDN==30, 31, ratioDN)
-	ratioDN = np.where(ratioDN==32, 33, ratioDN)
-	ratioDN = np.where(ratioDN==34, 35, ratioDN)
-	ratioDN = np.where(ratioDN==36, 37, ratioDN)
-	ratioDN = np.where(ratioDN==38, 39, ratioDN)
-	ratioPD = np.round(((mcTableAgg.sNmono - mcTableAgg['sp%pp'])/mcTableAgg.sNmono).values,1)*10+40 # ratio of plates and dendrites
-	ratioPD = np.where(ratioPD==40, 41, ratioPD)
-	ratioPD = np.where(ratioPD==42, 43, ratioPD)
-	ratioPD = np.where(ratioPD==44, 45, ratioPD)
-	ratioPD = np.where(ratioPD==46, 47, ratioPD)
-	ratioPD = np.where(ratioPD==48, 49, ratioPD)
 
-	# define condition for plates and dendrites:
-	condPD = mcTableAgg['sp%pp'] + mcTableAgg['sp%dd'] == mcTableAgg.sNmono
-	# define condition for plate and needle:
-	condPN = (mcTableAgg['sp%dd'] == 0) & (mcTableAgg['sp%pp'] > 0) & (mcTableAgg.sNmono > mcTableAgg['sp%pp'])
-	# define condition for dendrite and needle: 
-	condDN = (mcTableAgg['sp%pp'] == 0) & (mcTableAgg['sp%dd'] > 0) & (mcTableAgg.sNmono > mcTableAgg['sp%dd'])
-	# define condition for needle:
-	condN = mcTableAgg['sp%pp'] + mcTableAgg['sp%dd'] == 0
-	# define condition for plates:
-	condP  = mcTableAgg['sp%pp'] == mcTableAgg.sNmono
-	#plates = mcTableAgg.where(mcTableAgg['sp%pp'] == mcTableAgg.sNmono,drop=True)
-	# define dendrites:
-	condD = mcTableAgg['sp%dd'] == mcTableAgg.sNmono
-	
-	mcTableAgg['habit_code'] = mcTableAgg.sNmono.copy()*0
-	habit_code = mcTableAgg.habit_code
-	habit_code = xr.where(condDN, ratioDN, habit_code)
-	habit_code = xr.where(condPN, ratioPN, habit_code)
-	habit_code = xr.where(condPD, ratioPD, habit_code)
-	habit_code = xr.where(condP, 0, habit_code)
-	habit_code = xr.where(condD, 2, habit_code)
-	habit_code = xr.where(condN,1,habit_code)
-	# mcTableAgg['habit_code'] = mcTableAgg.habit_code.where(np.logical_not(condDN), ratioDN)#, mcTable['habit_code'])
-	# mcTableAgg['habit_code'] = mcTableAgg.habit_code.where(np.logical_not(condPN), ratioPN)#, mcTable['habit_code'])
-	# mcTableAgg['habit_code'] = mcTableAgg.habit_code.where(np.logical_not(mcTableAgg['sp%pp'] + mcTableAgg['sp%dd'] == mcTableAgg.sNmono), ratioPD)#, mcTable['habit_code'])
-	# mcTableAgg['habit_code'] = mcTableAgg.habit_code.where(np.logical_not(mcTableAgg['sp%pp'] == mcTableAgg.sNmono), 0)#, mcTable['habit_code'])
-	# mcTableAgg['habit_code'] = mcTableAgg.habit_code.where(np.logical_not(mcTableAgg['sp%dd'] == mcTableAgg.sNmono), 2)#, mcTable['habit_code'])
-	# mcTableAgg['habit_code'] = mcTableAgg.habit_code.where(np.logical_not(mcTableAgg['sp%pp'] + mcTableAgg['sp%dd'] == 0), 1)#, mcTable['habit_code'])
+	# separate into species;
+	mcTableAgg, mcTableCry, mcTableFrozen, mcTableMelted, mcTableLiquid = prepare_mcTable(mcTable,dicSettings)
 	#mcDN = mcTableAgg.where(habit_code > 30)
 	#mcDN = mcDN.where(habit_code < 40, drop=True)
 	#print(len(mcDN.index), 'DN')
@@ -303,25 +379,29 @@ def fullRadar(dicSettings, mcTable):
 	else:
 		elevation_radius = dicSettings['beta']
 	search_radii = dict(
-						logmass=abs(np.log10(1) - np.log10(1.05)), # 2 %
-						logDmax=abs(np.log10(1) - np.log10(1.05)), # 5 %
+						logmass=abs(np.log10(1) - np.log10(1.02)), # 2 %
+						logDmax=abs(np.log10(1) - np.log10(1.02)), # 5 %
 						elevation = elevation_radius,
 						wavelength = 0.1,
-						#habit = 7, # 10 % for habit code (which works because habit=0 for plates, so 0 tolerance, habit = 1 for dendrites, so 10% tolerance will not shift to other habit, only if habit = 20 or large, then 10% will be a int number)
+						habit = 0.5, # 10 % for habit code (which works because habit=0 for plates, so 0 tolerance, habit = 1 for dendrites, so 10% tolerance will not shift to other habit, only if habit = 20 or large, then 10% will be a int number)
 						)
+	print(DDA_data_agg, search_radii)
 	treeAgg, scalingAgg = gen_ckdtree(DDA_data_agg, search_radii)
 	
 	search_radii = dict(
-						logmass=abs(np.log10(1) - np.log10(1.1)), # 2 %
-						logDmax=abs(np.log10(1) - np.log10(1.1)), # 5 %
-						logar = abs(np.log10(1) - np.log10(1.1)), # 2 %
+						logmass=abs(np.log10(1) - np.log10(1.05)), # 5 %
+						logDmax=abs(np.log10(1) - np.log10(1.05)), # 5 %
+						logar = abs(np.log10(1) - np.log10(1.05)), # 5 %
 						elevation = elevation_radius,
 						wavelength = 0.1,
 						)
-	treeCry, scalingCry = gen_ckdtree(DDA_data_cry, search_radii)
-
+	#treeCry, scalingCry = gen_ckdtree(DDA_data_cry, search_radii)
+	treeCry = None; scalingCry = None
 	for i, heightEdge0 in enumerate(dicSettings['heightRange']):
-
+		if len(dicSettings['gridBaseArea']) > 1:
+			vol = dicSettings['gridBaseArea'][i] * dicSettings['heightRes']
+		else:
+			vol = dicSettings['gridBaseArea'] * dicSettings['heightRes']
 		heightEdge1 = heightEdge0 + dicSettings['heightRes']
 
 		print('Range: from {0} to {1}'.format(heightEdge0, heightEdge1))
@@ -331,27 +411,65 @@ def fullRadar(dicSettings, mcTable):
 			 					(mcTableAgg['sHeight']<=heightEdge1),drop=True)
 		mcTableCryTmp = mcTableCry.where((mcTableCry['sHeight']>heightEdge0) &
 			 					(mcTableCry['sHeight']<=heightEdge1),drop=True)
+		mcTableFrozenTmp = mcTableFrozen.where((mcTableFrozen['sHeight']>heightEdge0) &
+			 					(mcTableFrozen['sHeight']<=heightEdge1),drop=True)
+		mcTableMeltedTmp = mcTableMelted.where((mcTableMelted['sHeight']>heightEdge0) &
+			 					(mcTableMelted['sHeight']<=heightEdge1),drop=True)
+		mcTableLiquidTmp = mcTableLiquid.where((mcTableLiquid['sHeight']>heightEdge0) &
+			 					(mcTableLiquid['sHeight']<=heightEdge1),drop=True)
 		#print(mcTableCryTmp)
 		#print(mcTableAggTmp)
 		#print(mcTableTmp.vel)
 		if mcTableTmp.vel.any():
-			mcTableTmp = calcParticleZe(dicSettings['wl'], dicSettings['elv'], mcTableTmp,mcTableAggTmp,mcTableCryTmp, dicSettings['scatSet'],dicSettings['beta'],dicSettings['beta_std'],treeAgg,scalingAgg,treeCry,scalingCry,DDA_data_agg,DDA_data_cry)#,height=(heightEdge1+heightEdge0)/2)
+			mcTableTmp = calcParticleZe(dicSettings['wl'], dicSettings['elv'], mcTableTmp,mcTableAggTmp,mcTableCryTmp,mcTableFrozenTmp,mcTableMeltedTmp,mcTableLiquidTmp,
+							   dicSettings['scatSet'],dicSettings['beta'],dicSettings['beta_std'],treeAgg,scalingAgg,treeCry,scalingCry,DDA_data_agg,DDA_data_cry, ice_core=dicSettings['scatSet']['ice_core'])#,height=(heightEdge1+heightEdge0)/2)
 			#- get the spectra, there is the possibility to add shear, but I have not implemented it yet
 			k_theta, k_phi, k_r = 0,0,0
 			tmpSpecXR = getMultFrecSpec(dicSettings['wl'], dicSettings['elv'],mcTableTmp, dicSettings['velBins'],
 										dicSettings['velCenterBin'], (heightEdge1+heightEdge0)/2,dicSettings['convolute'],dicSettings['nave'],dicSettings['noise_pow'],
 										dicSettings['eps_diss'], dicSettings['uwind'],dicSettings['time_int'], dicSettings['theta']/2./180.*np.pi,
 										k_theta,k_phi,k_r, dicSettings['tau'])
+			print(vol)
 			tmpSpecXR = tmpSpecXR/vol
 			#print(tmpSpecXR)
 			
 			#quit()
 			tmpKdpXR =  getIntKdp(mcTableTmp,(heightEdge1+heightEdge0)/2)
+			#print(vol)
 			specXR = xr.merge([specXR,tmpSpecXR, tmpKdpXR/vol])
-			plt.pcolormesh(specXR.vel,specXR.range, 10*np.log10(specXR.spec_H.sel(wavelength=8,elevation=90,method='nearest')),vmin=-50,vmax=20,cmap='turbo')
-			plt.colorbar()
-			plt.xlim(-3,0)
-			plt.savefig('test_KDTree_crystals.png')
+			#print(specXR.KDP.min(), specXR.KDP.max())
+			#print('Agg',specXR.KDPAgg.min(), specXR.KDPAgg.max())
+			#print('Mono',specXR.KDPMono.min(), specXR.KDPMono.max())
+			# plt.plot(specXR.range, specXR.KDP.sel(elevation=30,wavelength=3, method='nearest'))
+			# plt.plot(specXR.range, specXR.KDPMono.sel(elevation=30,wavelength=3, method='nearest'),label='Mono')
+			# plt.plot(specXR.range, specXR.KDPAgg.sel(elevation=30,wavelength=3, method='nearest'),label='Agg')
+			# plt.legend()
+			# plt.show()
+			fig,ax = plt.subplots(ncols=3,figsize=(15,5),constrained_layout=True)
+			Ze_H = specXR['spec_H'].sum(dim='vel')
+			ZeKa = 10*np.log10(Ze_H.sel(wavelength=8,elevation=90,method='nearest'))
+			ZeW = 10*np.log10(Ze_H.sel(wavelength=3,elevation=90,method='nearest'))
+
+			ax[0].plot(ZeKa-ZeW,specXR.range)
+			ax[0].set_ylabel('Range [m]',fontsize=16)
+			ax[0].set_xlabel('DWR KaW [dB]',fontsize=16)
+			
+			ax[1].plot(specXR.KDP.sel(wavelength=3,elevation=30, method='nearest'),specXR.range)
+			ax[1].set_ylabel('Range [m]',fontsize=16)
+			ax[1].set_xlabel('KDP W [deg/km]',fontsize=16)
+
+			p1 = ax[2].pcolormesh(specXR.vel,specXR.range, 10*np.log10(specXR.spec_H.sel(wavelength=8,elevation=90,method='nearest')),vmin=-30,vmax=10,cmap='turbo')
+			cb = plt.colorbar(p1,ax=ax[2])
+			cb.set_label('Spec_H Ka [dBZ/(m/s)]',fontsize=16)
+			cb.ax.tick_params(labelsize=16)
+			ax[2].set_xlabel('Velocity [m/s]',fontsize=16)
+			ax[2].set_ylabel('Range [m]',fontsize=16)
+			ax[2].set_xlim(-2,0)
+			for a in ax:
+				a.tick_params(labelsize=16)
+				a.grid()
+				#plt.show()
+			plt.savefig('test_newMcRadar.png')
 			plt.close()
 
 			if dicSettings['attenuation'] == True:
@@ -369,6 +487,8 @@ def fullRadar(dicSettings, mcTable):
 				specXR['spec_H_att'] = specXR.spec_H/(10**(specXR.att_atm_ice_HH/10))
 				specXR['spec_V'] = specXR.spec_V/(10**(specXR.att_atm_ice_VV/10))
 				specXR['spec_HV'] = specXR.spec_HV/(10**(specXR.att_atm_ice_HH/10))
+		else:
+			print('empty dataset at this height range')
 	return specXR
 
 def singleParticleTrajectories(dicSettings, mcTable):
