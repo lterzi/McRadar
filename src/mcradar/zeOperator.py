@@ -9,7 +9,8 @@ from sklearn import neighbors
 from tqdm import tqdm
 from scipy import constants
 import pandas as pd
-
+import matplotlib.pyplot as plt
+                            
 debugging = False
 onlyInterp = False
 
@@ -231,7 +232,7 @@ def search_ckdtree(tree, scaling, target):
 	idx = tree.query_ball_point(scaled_target, r=1.0)
 	return idx 
 
-def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,mcTableFrozen,mcTableMelted,mcTableLiquid,scatSet,beta,beta_std,treeAgg,scalingAgg,treeCry,scalingCry,DDA_data_agg,DDA_data_cry, temperature=None, ice_core=True):#zeOperator
+def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,mcTableFrozen,mcTableMelted,mcTableLiquid,scatSet,beta,beta_std,treeAgg,scalingAgg,treeCry,scalingCry,DDA_data_agg,DDA_data_cry,nmono_array, temperature=None, ice_core=True,height=None):#zeOperator
     """
     Calculates the horizontal and vertical reflectivity of 
     each superparticle from a given distribution of super 
@@ -321,10 +322,10 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,mcTableFrozen,mcTabl
                                             }
                         
                         
-                        mcTable['sZeH'].loc[elv,wl,mcTableCry.index] = scatPoints['cbck_h']*2*np.pi # multiply by 2pi to be consistent with Rayleigh
+                        mcTable['sZeH'].loc[elv,wl,mcTableCry.index] = scatPoints['cbck_h']*2*np.pi*2*np.pi # multiply by 2pi to be consistent with Rayleigh
                         mcTable['sCextH'].loc[elv,wl,mcTableCry.index] = scatPoints['cext_h']
                         mcTable['sCextV'].loc[elv,wl,mcTableCry.index] = scatPoints['cext_v']
-                        mcTable['sZeV'].loc[elv,wl,mcTableCry.index] = scatPoints['cbck_v']*2*np.pi
+                        mcTable['sZeV'].loc[elv,wl,mcTableCry.index] = scatPoints['cbck_v']*2*np.pi*2*np.pi
                         mcTable['sZeHV'].loc[elv,wl,mcTableCry.index] = scatPoints['cbck_hv']
                         mcTable['sKDP'].loc[elv,wl,mcTableCry.index] = scatPoints['kdp']
                 else:
@@ -386,13 +387,15 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,mcTableFrozen,mcTabl
                 target = dict(
                         logmass     = np.log10(mcTableAgg.mTot.values),
                         logDmax     = np.log10(mcTableAgg.dia.values),
-                        abs_elevation 	= np.ones(len(mcTableAgg.mTot.values))*elv,
+                        elevation 	= np.ones(len(mcTableAgg.mTot.values))*elv,
                         wavelength  = np.ones(len(mcTableAgg.mTot.values))*wl,
-                        habit       = mcTableAgg.habit_code.values,
+                        #habit       = mcTableAgg.habit_code.values,
+                        #Nmono       = mcTableAgg.sNmono.values,
                     )
                 search_idx = search_ckdtree(treeAgg, scalingAgg, target)
-
-
+                # if elv == 30:
+                #    fig1,ax1 = plt.subplots(ncols=3,nrows=4,figsize=(20,15),constrained_layout=True)
+                #fig2,ax2 = plt.subplots(ncols=3,nrows=3,figsize=(15,15),constrained_layout=True)            
                 if False:
                     for i_part, trgt, idx in tqdm(zip(range(mcTableAgg.index.size), zip(*target.values()), search_idx), total=mcTableAgg.index.size):
                         #print(f"for super particle {trgt=}, we have {len(idx)=} entries") 
@@ -420,51 +423,89 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,mcTableFrozen,mcTabl
                         # mcTable['sMult'].loc[superparticle.index] = 1 # Note, cant do it here because it would change results next iteration
                     print(f"aggregate scattering lookup took {time.time() - start}s")
                 else:
+                    
                     def scatLookup():
                         variables = ('ZeH', 'CextH', 'CextV', 'ZeV', 'ZeHV', 'KDP')
                         result = mcTableAgg.sel(elevation=elv, wavelength=wl).get([f"s{_}" for _ in variables]).copy() # local slice that gets updated
                         not_found_particles = []
                         particles_smaller_smult = []
-                        particles_smaller_idx = []
+                        particles_smaller_10 = []
+                        particles_large_spread = []
+                        
                         for isp, idx in enumerate((search_idx)):
+                            
                         #for isp, idx in enumerate(tqdm(search_idx)):
+                            if len(idx) < 1:
+                                #raise ( ValueError(f'Could not find scattering props for aggregate: {elv=} {wl=} {mcTableAgg.isel(index=isp).get(["mTot","dia"]).to_dict()=}') )
+                                #print(mcTableAgg.sNmono[isp].values)
+                                not_found_particles.append(isp)
+                                continue
+                            
+                            
+                            idx = np.asarray(idx, dtype=np.int64)  # 
+                            mask = nmono_array[idx] > 10  # only Nmono larger 10
+                            idx = idx[mask]
                             if len(idx) < 1:
                                 #raise ( ValueError(f'Could not find scattering props for aggregate: {elv=} {wl=} {mcTableAgg.isel(index=isp).get(["mTot","dia"]).to_dict()=}') )
                                 not_found_particles.append(isp)
                                 continue
+                            # KDPdata = DDA_data_agg.KDP.data[idx]
+                            # meanKDP = np.mean(KDPdata)
+                            # stdKDP = np.std(KDPdata)
+                            # #medianKDP = np.median(DDA_data_agg.KDP.data[idx])
+                            # spread_around_mean = np.abs((KDPdata - meanKDP)/stdKDP)
+                            # #print(spread_around_mean < 1.5)
+                            # #print(idx)
+                            # #print(spread_around_mean)
+                            # #quit()
+                            # idx = idx[spread_around_mean < 0.75] # only take values within 1.5 stddev around mean                            
 
+                            #if stdKDP > 0.5*abs(meanKDP):
+                            #    particles_large_spread.append(isp)
+                                #print('large spread KDP for particle', isp, 'mean KDP:', meanKDP, 'std KDP:', stdKDP, 'median KDP:', medianKDP)
+                                #continue
                             xi = int(mcTableAgg.sMult[isp])
                             
                             if len(idx) < xi:
                                 particles_smaller_smult.append(xi)
-                                particles_smaller_idx.append(len(idx))
+                                #particles_smaller_idx.append(len(idx))
                                 #print(len(idx),'<',xi,'for particle',isp,'sMult',mcTableAgg.sMult.isel(index=isp).values)
                             # for now we accept all acceptable scattering aggregates with equal weight # what is happening here: randomly select particles out of candidates, maximal: xi, minimal: all candidates
+                            
                             if True:
                                 # randomly take xi many out of candidates
                                 idx = np.random.choice(idx, min(len(idx), xi), replace=False)
                             else:
                                 # we just take the first ones up to xi
                                 idx = idx[:xi]
-                            Ncandidates = len(idx)
+                            #Ncandidates = len(idx)
 
-                            wgt = np.ones(Ncandidates) * xi / Ncandidates
+                            if False:
+                                wgt = np.ones(Ncandidates) * xi / Ncandidates
 
-                            # normalize to make sure however many candidates we have, we end up with xi contribution
-                            wgt *= 2 * np.pi * xi / np.sum(wgt) #2 * np.pi * xi / np.sum(wgt) # multiply by 2pi, to make consistent with Rayleigh
+                                # normalize to make sure however many candidates we have, we end up with xi contribution
+                                wgt *= xi / np.sum(wgt) #2 * np.pi * xi / np.sum(wgt) # multiply by 2pi, to make consistent with Rayleigh
 
                             for v in variables:
-                                result[f"s{v}"][isp] = np.sum(DDA_data_agg[v].data[idx] * wgt)
+                                #print(f"s{v}min", np.min(DDA_data_agg[v].data[idx]), "max", np.max(DDA_data_agg[v].data[idx]))
+                                if 'Z' in v:
+                                    # add 2pi factor here for Ze to be consistent with Rayleigh
+                                    result[f"s{v}"][isp] = np.mean(DDA_data_agg[v].data[idx])*xi*2*np.pi#np.sum(DDA_data_agg[v].data[idx] * wgt)*2*np.pi
+                                else:
+                                    result[f"s{v}"][isp] = np.mean(DDA_data_agg[v].data[idx])*xi#np.sum(DDA_data_agg[v].data[idx] * wgt)
 
-                        return result, not_found_particles, particles_smaller_smult, particles_smaller_idx
+                        return result, not_found_particles, particles_smaller_smult, particles_smaller_10#, p1
 
-                    scat_agg, not_found_particles, particles_smaller_smult, particles_smaller_idx = scatLookup()
-                    #print(f"aggregate scattering lookup took {time.time() - start}s for len(search_idx)")
+                    scat_agg, not_found_particles, particles_smaller_smult, particles_smaller_10 = scatLookup()
                     
                     if len(not_found_particles) > 1:
                         print(f"Warning, we have {len(not_found_particles)} of {len(search_idx)} aggs that did not match the DDA scatter db")
                         print(f"Missing mass: {float(mcTableAgg.mTot.isel(index=not_found_particles).sum())} of {float(mcTableAgg.mTot.sum())} ",
                                 f"({100*float(mcTableAgg.mTot.isel(index=not_found_particles).sum()) / float(mcTableAgg.mTot.sum())}%)")
+                    if len(particles_smaller_10) > 1:
+                        print(f"Warning, we have {len(particles_smaller_10)} of {len(search_idx)} aggs that had less than 10 scatter db entries")
+                        print(f"Missing mass: {float(mcTableAgg.mTot.isel(index=particles_smaller_10).sum())} of {float(mcTableAgg.mTot.sum())} ",
+                                f"({100*float(mcTableAgg.mTot.isel(index=particles_smaller_10).sum()) / float(mcTableAgg.mTot.sum())}%)")
                     # #print(mcTable)    
                     # if len(particles_smaller_smult) > 1:
                     #     print(f"Warning, we have {len(particles_smaller_smult)} of {len(search_idx)} aggs that had less scatter db entries than sMult")
@@ -478,7 +519,13 @@ def calcParticleZe(wls, elvs,mcTable, mcTableAgg,mcTableCry,mcTableFrozen,mcTabl
                             k = 'sZeV'
                         mcTable[k].loc[dict(elevation=elv, wavelength=wl, index=scat_agg.index)] = v
                     #quit()
-            
+                # if elv==30:
+                #     #cbar = fig1.colorbar(p1,ax=ax1.ravel().tolist(),aspect=70, pad=0.01)
+                #     #cbar.ax.tick_params(labelsize=12)
+                #     #cbar.set_label('Number of candidates from LUT', fontsize=18)
+                #     fig1.savefig('aggregate_lookup_stats_height{}_wl{:.2f}_elv{}.png'.format(height, wl,elv))
+                #     plt.close()
+                # #     #plt.close()
             if len(mcTableFrozen.mTot)>0:
                 print('Calculating frozen particles with T-matrix')
                 # now we use Tmatrix for the frozen particles...

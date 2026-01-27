@@ -377,21 +377,23 @@ def fullRadar(dicSettings, mcTable):
 	if dicSettings['beta_std'] == 0:
 		elevation_radius = 1
 	else:
-		elevation_radius = dicSettings['beta']
+		elevation_radius = dicSettings['beta_std']
 	search_radii = dict(
-						logmass=abs(np.log10(1) - np.log10(1.02)), # 2 %
-						logDmax=abs(np.log10(1) - np.log10(1.02)), # 5 %
+						logmass=abs(np.log10(1) - np.log10(1.05)), # 2 %
+						logDmax=abs(np.log10(1) - np.log10(1.05)), # 5 %
 						elevation = elevation_radius,
 						wavelength = 0.1,
-						habit = 0.5, # 10 % for habit code (which works because habit=0 for plates, so 0 tolerance, habit = 1 for dendrites, so 10% tolerance will not shift to other habit, only if habit = 20 or large, then 10% will be a int number)
+						#habit = 0.5, # 10 % for habit code (which works because habit=0 for plates, so 0 tolerance, habit = 1 for dendrites, so 10% tolerance will not shift to other habit, only if habit = 20 or large, then 10% will be a int number)
+						#Nmono = abs(np.log10(1) - np.log10(1.05)), # 5 %
 						)
 	print(DDA_data_agg, search_radii)
 	treeAgg, scalingAgg = gen_ckdtree(DDA_data_agg, search_radii)
+	nmono_array = DDA_data_agg.Nmono.values 
 	
 	search_radii = dict(
 						logmass=abs(np.log10(1) - np.log10(1.05)), # 5 %
 						logDmax=abs(np.log10(1) - np.log10(1.05)), # 5 %
-						logar = abs(np.log10(1) - np.log10(1.05)), # 5 %
+						logar = abs(np.log10(1) - np.log10(1.99)), # 5 %
 						elevation = elevation_radius,
 						wavelength = 0.1,
 						)
@@ -422,7 +424,7 @@ def fullRadar(dicSettings, mcTable):
 		#print(mcTableTmp.vel)
 		if mcTableTmp.vel.any():
 			mcTableTmp = calcParticleZe(dicSettings['wl'], dicSettings['elv'], mcTableTmp,mcTableAggTmp,mcTableCryTmp,mcTableFrozenTmp,mcTableMeltedTmp,mcTableLiquidTmp,
-							   dicSettings['scatSet'],dicSettings['beta'],dicSettings['beta_std'],treeAgg,scalingAgg,treeCry,scalingCry,DDA_data_agg,DDA_data_cry, ice_core=dicSettings['scatSet']['ice_core'])#,height=(heightEdge1+heightEdge0)/2)
+							   dicSettings['scatSet'],dicSettings['beta'],dicSettings['beta_std'],treeAgg,scalingAgg,treeCry,scalingCry,DDA_data_agg,DDA_data_cry,nmono_array, ice_core=dicSettings['scatSet']['ice_core'],height=(heightEdge1+heightEdge0)/2)
 			#- get the spectra, there is the possibility to add shear, but I have not implemented it yet
 			k_theta, k_phi, k_r = 0,0,0
 			tmpSpecXR = getMultFrecSpec(dicSettings['wl'], dicSettings['elv'],mcTableTmp, dicSettings['velBins'],
@@ -469,7 +471,7 @@ def fullRadar(dicSettings, mcTable):
 				a.tick_params(labelsize=16)
 				a.grid()
 				#plt.show()
-			plt.savefig('test_newMcRadar.png')
+			plt.savefig('test_newMcRadar_Nmono10_avg.png')
 			plt.close()
 
 			if dicSettings['attenuation'] == True:
