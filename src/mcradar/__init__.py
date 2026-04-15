@@ -2,24 +2,14 @@
 
 """Top-level package for McRadar."""
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
-from .settings import loadSettings
-from .tableOperator import getMcSnowTable
-
-from .spectraOperator import getMultFrecSpec
-from .spectraOperator import convoluteSpec
-from .zeOperator import calcParticleZe
-from .kdpOperator import getIntKdp
+from .settings import RadarSettings
+from .spectraOperator import SpectraOperator
+from .zeOperator import ZeOperator
+from .kdpOperator import KdpOperator
 from .attenuationOperator import getHydroAtmAtt
-
-from .fullRadarOperator import fullRadar
-from .fullRadarOperator import fullRadarParallel
-from .fullRadarOperator import fullRadarParallelNew
-
-from .fullRadarOperator import singleParticleTrajectories
-from .fullRadarOperator import singleParticleScat
-
+from .fullRadarOperator import RadarSimulation
 from .utilities import *
 
 
