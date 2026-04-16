@@ -2,15 +2,15 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
 import numpy as np
-import xarray as xr
-import warnings
-import time
-from sklearn import neighbors
-from tqdm import tqdm
-from scipy import constants
-import pandas as pd
-import matplotlib.pyplot as plt
-from scipy.stats import truncnorm
+#import xarray as xr
+#import warnings
+#import time
+#from sklearn import neighbors
+#from tqdm import tqdm
+#from scipy import constants
+#import pandas as pd
+#import matplotlib.pyplot as plt
+#from scipy.stats import truncnorm
 
 debugging = False
 onlyInterp = False
@@ -627,6 +627,7 @@ class ZeOperator:
                     elif k == 'sZeH':
                         key = 'sZeV'
                     mcTable[key].loc[dict(elevation=elv, wavelength=wl, index=result.index)] = v
+        mcTable['sMult'].loc[dict(index=mcTableAgg.index)] = 1 # we need to make sMult 1 because we already multiplied the scattering variables by sMult when we assigned them from the DDA table, so we should not multiply by sMult again when we sum over particles in the same bin
 
     def _handle_frozen(self, mcTable, mcTableFrozen, beta_std_use, height):
         """
@@ -686,7 +687,8 @@ class ZeOperator:
         # Melted-specific scattering logic (modularized from calcParticleZe)
         import numpy as np
         from scattnlay import scattnlay
-        from pytmatrix import refractive
+        #from pytmatrix import refractive
+        from mcradar import refractive
         print('Handling melted particles at height', height, 'with', len(mcTableMelted.mTot), 'particles')
         scatSet = self.settings['scatSet'] if isinstance(self.settings, dict) and 'scatSet' in self.settings else self.settings
         wls = self.settings['wl'] #scatSet['wls'] if 'wls' in scatSet else [scatSet['wl']]

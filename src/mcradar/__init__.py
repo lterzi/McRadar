@@ -11,6 +11,7 @@ from .kdpOperator import KdpOperator
 from .attenuationOperator import getHydroAtmAtt
 from .fullRadarOperator import RadarSimulation
 from .utilities import *
+from .refractive import *
 
 
 

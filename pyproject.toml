@@ -21,5 +21,9 @@ dependencies = [
     "scipy",
     "netCDF4",
     "scikit-learn",
+    "scattnlay",
+    #"pytmatrix", # only if frozen particles are handled differently than crystals. Right now not implemented
 ]
 requires-python = ">=3.9"
+[project.scripts]
+spheroidMcRadar = "mcradar.spheroidMcRadar:main"
