@@ -11,6 +11,19 @@ from sys import argv
 import os
 #%%
 def grid_info(gridfile='Torus_Triangles_1024x4_150m.nc'):
+    """
+    Load grid information from a NetCDF file and compute grid metrics.
+
+    Parameters
+    ----------
+    gridfile : str, optional
+        Path to the grid NetCDF file (default: 'Torus_Triangles_1024x4_150m.nc').
+
+    Returns
+    -------
+    dict
+        Dictionary with dx, dz, vol, domain_length, and domain_length_y.
+    """
     print(f"Trying to load grid info from {gridfile=}")
     with xr.open_dataset(gridfile) as grid:
        dx = dy = dz = float(grid.edge_length.isel(edge=0))
@@ -20,6 +33,23 @@ def grid_info(gridfile='Torus_Triangles_1024x4_150m.nc'):
        print(f"{dx=} {dz=} {domain_length=} {vol=}")
     return dict(dx=dx, dz=dz, vol=vol, domain_length=domain_length, domain_length_y=domain_length_y)
 def gen_ckdtree(aggdb, search_radii):
+    """
+    Construct a cKDTree for fast nearest-neighbor search in aggregate database.
+
+    Parameters
+    ----------
+    aggdb : dict or structured array
+        Aggregate database with dimensions as keys.
+    search_radii : dict
+        Dictionary of search radii for each dimension.
+
+    Returns
+    -------
+    tree : cKDTree
+        Constructed KDTree object.
+    scaling : np.ndarray
+        Scaling factors for each dimension.
+    """
     import time
     start = time.time()
     scaling = np.array([1.0 / search_radii[dim] for dim in search_radii.keys()]) # scale euclidean space for search
@@ -29,52 +59,20 @@ def gen_ckdtree(aggdb, search_radii):
     end = time.time()
     print(f"construction of ckdtree took {end - start}s")
     return tree, scaling
-
-varentry = {
-        'm_w'       : ( 1, 'liq. mass [kg]'),
-        'm_i'       : ( 2, 'ice mass [kg]'),
-        'm_r'       : ( 3, 'rimed mass [kg]'),
-        'v_r'       : ( 4, 'volume rime [m3]'),
-        'd'         : ( 5, 'diameter [m]'),
-        'A'         : ( 6, 'projected area [m2]'),
-        'xi'        : ( 7, 'multiplicity'),
-        'mm'        : ( 8, 'monomer multiplicity'),
-        'statusb'   : ( 9, 'status bit'),
-        'vt'        : (10, 'vt'),
-        'gblCellId' : (11, 'gblCellId'),
-        'jk'        : (12, 'jk'),
-        'm_f'       : (13, 'frozen mass [kg]'),
-        'T'         : (14, 'particle Temperature [K]'),
-        'atmoT'     : (15, 'atmospheric temperature'),
-        'dQdt'      : (16, 'dQdt'),
-        'V_i'       : (17, 'volume of ice part [m3]'),
-        'phi'       : (18, 'aspect ratio []'),
-        'pp'        : (19, 'number of prolate particles (monomers) [#]'),
-        'dd'        : (20, 'number of dendrite monomers [#]'),
-        }
-def ds_get_var(ds, varname, multiplicity=True):
-    get_var = lambda vname: ds[f'addVar{varentry[vname][0]:04d}']
-    if varname == 'm_tot':
-        vardata = xr.concat([ get_var(vname) for vname in ('m_f', 'm_w', 'm_i', 'm_r')], dim='tracer').sum('tracer')
-    else:
-        vardata = get_var(varname)
-
-    if multiplicity:
-        vardata *= get_var('xi')
-    return vardata
 def calcRho(mcTable):
     """
-    Calculate the density of each super particles [g/cm^3].
-    
+    Calculate the density of each superparticle [kg/m^3].
+
     Parameters
     ----------
-    mcTable: output from getMcSnowTable()
-    
+    mcTable : xarray.Dataset
+        Output from getMcSnowTable().
+
     Returns
     -------
-    mcTable with an additional column for the density.
-    The density is calculated separately for aspect ratio < 1
-    and for aspect ratio >= 1.
+    mcTable : xarray.Dataset
+        Table with an additional column for the density ('sRho_tot').
+        The density is calculated separately for aspect ratio < 1 and >= 1.
     """
     
     # density calculation for different AR ranges
@@ -102,22 +100,20 @@ def calcRho(mcTable):
 def calculate_radial_velocity(model_data,azimuth, elevation):
     """
     Calculate the radial velocity component along the radar beam direction.
-    
+
     Parameters
     ----------
     model_data : xarray.Dataset
-        Model output data with u_vel, v_vel, w_vel, vt
-    radar_x, radar_y, radar_z : float
-        Radar position coordinates
+        Model output data with u_vel, v_vel, w_vel, vt.
     azimuth : float
-        Beam azimuth angle in degrees (0-360, 0=North, 90=East)
+        Beam azimuth angle in degrees (0-360, 0=North, 90=East).
     elevation : float
-        Beam elevation angle in degrees (-90 to 90, 0=horizontal)
-    
+        Beam elevation angle in degrees (-90 to 90, 0=horizontal).
+
     Returns
     -------
     radial_velocity : xarray.DataArray
-        Velocity component along radar beam direction
+        Velocity component along radar beam direction.
     """
     
     # Convert angles to radians
@@ -149,26 +145,26 @@ def calculate_radial_velocity(model_data,azimuth, elevation):
 def select_radar_beam_data(model_data, radar_x, radar_y, radar_z, azimuth, elevation, beam_width, max_range):
     """
     Select model data within a radar beam's conical area.
-    
+
     Parameters
     ----------
     model_data : xarray.Dataset
-        Model output data with x, y, z as data variables
+        Model output data with x, y, sHeight as data variables.
     radar_x, radar_y, radar_z : float
-        Radar position coordinates
+        Radar position coordinates.
     azimuth : float
-        Beam azimuth angle in degrees (0-360, 0=North, 90=East)
+        Beam azimuth angle in degrees (0-360, 0=North, 90=East).
     elevation : float
-        Beam elevation angle in degrees (-90 to 90, 0=horizontal)
+        Beam elevation angle in degrees (-90 to 90, 0=horizontal).
     beam_width : float
-        Half-power beam width in degrees
+        Half-power beam width in degrees.
     max_range : float
-        Maximum range to consider
-    
+        Maximum range to consider.
+
     Returns
     -------
     beam_data : xarray.Dataset
-        Data points within the radar beam
+        Data points within the radar beam.
     """
     
     # Convert angles to radians
@@ -226,6 +222,20 @@ def select_radar_beam_data(model_data, radar_x, radar_y, radar_z, azimuth, eleva
 def calc_beam_area(range_vec, beam_width_deg, elevation_deg):
     """
     Calculate beam cross-sectional area for any elevation angle.
+
+    Parameters
+    ----------
+    range_vec : array-like
+        Range(s) from radar [m].
+    beam_width_deg : float
+        Half-power beam width [degrees].
+    elevation_deg : float
+        Elevation angle [degrees].
+
+    Returns
+    -------
+    area : array-like
+        Cross-sectional area(s) [m^2].
     """
     beam_width_rad = np.radians(beam_width_deg / 2)
     elevation_rad = np.radians(elevation_deg)
@@ -244,22 +254,22 @@ def calc_beam_area(range_vec, beam_width_deg, elevation_deg):
 def calc_beam_volume(range_vec, range_res, beam_width_deg, elevation_deg=None):
     """
     Calculate the volume of each range bin for a radar beam.
-    
+
     Parameters
     ----------
-    range_vec : array
-        Range bin centers [m]
+    range_vec : array-like
+        Range bin centers [m].
     range_res : float
-        Range resolution (bin width) [m]
+        Range resolution (bin width) [m].
     beam_width_deg : float
-        Half-power beam width [degrees]
+        Half-power beam width [degrees].
     elevation_deg : float, optional
         Elevation angle [degrees]. Not needed for volume calculation.
-    
+
     Returns
     -------
-    volumes : array
-        Volume of each range bin [m³]
+    volumes : array-like
+        Volume of each range bin [m³].
     """
     
     # Convert beam width to radians (half angle)
@@ -280,109 +290,42 @@ def calc_beam_volume(range_vec, range_res, beam_width_deg, elevation_deg=None):
     volumes = (np.pi / 3) * range_res * (R1**2 + R1*R2 + R2**2)
     
     return volumes
-def plot_beam_verification(dss, beam_data, radar_x, radar_y, radar_z, azimuth, elevation, beam_width, max_range):
-    """
-    Create comprehensive plots to verify radar beam selection.
-    """
-    
-    # 1. 3D scatter plot showing the conical beam
-    fig = plt.figure(figsize=(15, 5))
-    
-    # Plot 1: Side view (x-z or y-z depending on azimuth)
-    ax1 = fig.add_subplot(131)
-    
-    # Plot all data in gray
-    plt.scatter(dss.x*1e-3, dss.sHeight*1e-3, c='gray', s=0.1, alpha=0.3, label='All data')
-    
-    # Plot selected beam data in color
-    if len(beam_data.sHeight) > 0:
-        plt.scatter(beam_data.x*1e-3, beam_data.sHeight*1e-3, 
-                   c=beam_data.mTot, s=1, cmap='viridis', 
-                   norm=matplotlib.colors.LogNorm(1e-12,1e-4), label='Beam data')
-    
 
-    plt.plot(radar_x*1e-3, radar_z*1e-3, 'ro', markersize=8, label='Radar')
-    plt.xlabel('x [km]')
-    plt.ylabel('Height [km]')
-    plt.title('Side View (x-z)')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.axis('equal')
-    # Plot 2: Top view (x-y)
-    ax2 = fig.add_subplot(132)
-    plt.scatter(dss.x*1e-3, dss.y*1e-3, c='gray', s=0.1, alpha=0.3)
-    if len(beam_data.sHeight) > 0:
-        plt.scatter(beam_data.x*1e-3, beam_data.y*1e-3, 
-                   c=beam_data.sHeight*1e-3, s=1, cmap='plasma')
-    
-    
-    #plt.plot(radar_x*1e-3, radar_y*1e-3, 'ro', markersize=8, label='Radar')
-    plt.xlabel('x [km]')
-    plt.ylabel('y [km]')
-    plt.xlim([3,7])
-    plt.ylim([-2,2])
-    #plt.ylim([dss.y.min().item()*1e-3, dss.y.max().item()*1e-3])
-    plt.title('Top View (x-y)')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    #plt.axis('equal')
-    
-    
-    plt.tight_layout()
-    return fig
 
-def plot_beam_cross_sections(dss, beam_data, radar_x, radar_y, radar_z, max_range):
-    """
-    Plot cross-sections at different heights to show beam footprint.
-    """
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-    
-    heights = [2000, 4000, 6000, 8000]  # Heights in meters
-    
-    for i, height in enumerate(heights):
-        ax = axes[i//2, i%2]
-        
-        # Select data near this height (±200m)
-        height_tolerance = 200
-        data_at_height = dss.where(
-            (dss.sHeight >= height - height_tolerance) & 
-            (dss.sHeight <= height + height_tolerance), 
-            drop=True
-        )
-        beam_at_height = beam_data.where(
-            (beam_data.sHeight >= height - height_tolerance) & 
-            (beam_data.sHeight <= height + height_tolerance), 
-            drop=True
-        )
-        
-        if len(data_at_height.sHeight) > 0:
-            ax.scatter(data_at_height.x*1e-3, data_at_height.y*1e-3, 
-                      c='gray', s=0.5, alpha=0.3)
-        
-        if len(beam_at_height.sHeight) > 0:
-            ax.scatter(beam_at_height.x*1e-3, beam_at_height.y*1e-3, 
-                      c=beam_at_height.mTot, s=2, cmap='viridis',
-                      norm=matplotlib.colors.LogNorm(1e-12,1e-4))
-        
-        # Draw theoretical beam circle
-        beam_width_rad = np.radians(0.6/2)  # Your beam width
-        radius = height * np.tan(beam_width_rad)
-        circle = plt.Circle((radar_x*1e-3, radar_y*1e-3), radius*1e-3, 
-                          fill=False, color='red', linewidth=2)
-        ax.add_patch(circle)
-        
-        ax.plot(radar_x*1e-3, radar_y*1e-3, 'ro', markersize=6)
-        ax.set_xlim([3,7])
-        ax.set_xlabel('x [km]')
-        ax.set_ylabel('y [km]')
-        ax.set_title(f'Height: {height/1000:.1f} km')
-        ax.grid(True, alpha=0.3)
-        ax.set_aspect('equal')
-    
-    plt.tight_layout()
-    return fig
+varentry = {
+        'm_w'       : ( 1, 'liq. mass [kg]'),
+        'm_i'       : ( 2, 'ice mass [kg]'),
+        'm_r'       : ( 3, 'rimed mass [kg]'),
+        'v_r'       : ( 4, 'volume rime [m3]'),
+        'd'         : ( 5, 'diameter [m]'),
+        'A'         : ( 6, 'projected area [m2]'),
+        'xi'        : ( 7, 'multiplicity'),
+        'mm'        : ( 8, 'monomer multiplicity'),
+        'statusb'   : ( 9, 'status bit'),
+        'vt'        : (10, 'vt'),
+        'gblCellId' : (11, 'gblCellId'),
+        'jk'        : (12, 'jk'),
+        'm_f'       : (13, 'frozen mass [kg]'),
+        'T'         : (14, 'particle Temperature [K]'),
+        'atmoT'     : (15, 'atmospheric temperature'),
+        'dQdt'      : (16, 'dQdt'),
+        'V_i'       : (17, 'volume of ice part [m3]'),
+        'phi'       : (18, 'aspect ratio []'),
+        'pp'        : (19, 'number of prolate particles (monomers) [#]'),
+        'dd'        : (20, 'number of dendrite monomers [#]'),
+        }
+def ds_get_var(ds, varname, multiplicity=True):
+    get_var = lambda vname: ds[f'addVar{varentry[vname][0]:04d}']
+    if varname == 'm_tot':
+        vardata = xr.concat([ get_var(vname) for vname in ('m_f', 'm_w', 'm_i', 'm_r')], dim='tracer').sum('tracer')
+    else:
+        vardata = get_var(varname)
+
+    if multiplicity:
+        vardata *= get_var('xi')
+    return vardata
 ######################################################################################################################################
-#%%
+
 # TODO: use actual u wind from ICON simulation for McRadar simulation
 # TODO: get frozen mass back in, but maybe make threshold with frozen mass and sphericity, size of particle? Righ now KDP is again ridiculously high at cloud top, so my particles probably don't work..
 # TODO: what if we increase the wobbling in areas where wind is high?
@@ -393,11 +336,10 @@ radarPosX1 = float(radarPosX)
 outFolder = '/project/meteo/work/L.Terzi/ICON_McSnow_Axel/{}/McRadar/particles0000{}/'.format(path,time)
 if not os.path.exists(outFolder):
     os.makedirs(outFolder)
-#quit()
-#time=5460
 radarPosX = float(radarPosX)
 number_of_beams = int(number_of_beams)
-# calculate McRadar now: 
+
+# Simulation parameters: 
 convolute=True
 elv = np.array([int(elv)]) # with this setup only one elevation angle is possible
 freq = np.array([9.6e9]) # in Hz np.array([5.6e9,9.6e9,35.5e9])#
@@ -412,19 +354,21 @@ ice_core = False
 lutPath = '/project/meteo/work/L.Terzi/McRadarTest/LUT/' #'/work/lvonterz/SSRGA/snowScatt/ssrga_LUT/' #'/data/optimice/McRadarLUTs/'
 # define the velocity vector:
 velVec = np.loadtxt('/project/meteo/work/L.Terzi/ICON_McSnow_Axel/doppler_vel_Xband.csv')
-#-- define range resolution 
+#-- define output Name: 
 outName = '{:.1f}GHz_elv{}_output_DDA_kdtree_melted_water_core_oriavgTru_gridVolume_beta{}_beta_std{}_particles0000{}.000_radarPosX{}_newMcRadar.nc'.format(freq[0]*1e-9,elv[0],beta,beta_std,time,int(radarPosX1))
-    
-dss = xr.open_dataset('/project/meteo/work/L.Terzi/ICON_McSnow_Axel/{}/McRadar/ICON_output_for_McRadar_particles0000{}.000.nc'.format(path,time))
-#print(dss)
-# for var in dss:
-#     print(var)
-#quit()
-dss = dss.rename({'altitude':'sHeight','noParts':'index','xi':'sMult','d':'dia','mm':'sNmono','phi':'sPhi'})
-#dss['vel'] = dss.vt+dss.w_vel # vel is combination of vertical wind and fall velocity
-#quit()
-#%%
 
+# now lets open the dataset and convert it to the format needed for McRadar.
+ginfo = grid_info('Torus_Triangles_1024x4_150m.nc') #gridfile
+file = '/project/meteo/work/L.Terzi/ICON_McSnow_Axel/{}/particles0000{}.000.nc'.format(path, time)
+dss = xr.open_dataset(file)
+dss['x'] = dss.longitude / (2*np.pi) * ginfo['domain_length']
+dss['y'] = dss.latitude              * ginfo['domain_length_y']
+
+dss['mTot'] = dss.m_f+ dss.m_w+ dss.m_i+ dss.m_r # mTot is not yet calculated, but we need that for McRadar
+dss = dss.rename({'altitude':'sHeight','noParts':'index','xi':'sMult','d':'dia','mm':'sNmono','phi':'sPhi'})
+
+# now we need to select the particles that are within the radar beam, and calculate the radial velocity for those particles, which is needed for the Doppler spectra calculation in McRadar. 
+# We will do this for multiple beams next to each other, and then average the spectra over those
 radarPosY = -100
 beamWidth = 0.6 # in degree#
 if elv == 90:
@@ -440,7 +384,6 @@ rangeVec = np.arange(0,maxRange,heightRes)
 dssnew = xr.Dataset()
 j = 0
 
-#beam_data = select_radar_beam_data(dss,radarPosX,radarPosY,0,270,elv,beamWidth,maxRange)
 #to get better Doppler Spectra we average over multiple beams next to each other
 for i in range(number_of_beams):
     print(i)
@@ -459,6 +402,7 @@ for i in range(number_of_beams):
         dssnew = xr.merge([beam_data,dssnew])
         j += 1
 
+# only if particles are found continue with the McRadar simulation, otherwise we can skip it and save some time.
 if j > 0:
     dssnew = dssnew.where(~np.isnan(dssnew.sHeight),drop=True)
     dssnew = dssnew.where(np.isfinite(dssnew.mTot),drop=True)
@@ -468,24 +412,24 @@ if j > 0:
     dssnew = dssnew.where(np.isfinite(dssnew.vel),drop=True)
     dssnew = calcRho(dssnew)
     dssnew['sRho_tot'] = dssnew.sRho_tot.where(dssnew.sRho_tot<918,918)
-    print(dssnew.sHeight.max().values,dssnew.sHeight.min().values)
-    #gridBaseArea = np.pi*(rangeVec*np.tan(np.deg2rad(beamWidth)/2))**2*number_of_beams# works only for vertical beam
-    #gridBaseArea = calc_beam_area(rangeVec, beamWidth, elv)*number_of_beams
-    #gridBaseArea = (rangeVec*np.tan(beamWidthRad))**2*number_of_beams
+    #- calculate the volume in the radar beams
     gridVolume = calc_beam_volume(rangeVec, heightRes, beamWidth, elv)*number_of_beams
-    #print('now calculating McRadar output')
-    settings_obj = RadarSettings(dataPath='', velVec=velVec, elv=elv, freq=freq, gridVolume=gridVolume, maxHeight=maxRange, minHeight=6000,
+    #- now define all settings of the simulation
+    settings_obj = RadarSettings(dataPath='', velVec=velVec, elv=elv, freq=freq, gridVolume=gridVolume, maxHeight=maxRange, minHeight=0,
                                  heightRes=heightRes, convolute=convolute, attenuation=attenuation, beta=beta, beta_std=beta_std, onlyIce=False,
                                  scatSet={'mode':scatMode, 'selmode':selMode, 'n_neighbors':n_neighbors, 'K2':0.93, 'lutPath':lutPath, 'orientational_avg':ori_avg, 'ice_core':ice_core})
     #print(settings_obj)
     dicSettings = settings_obj.settings
     radar_sim = RadarSimulation(dicSettings)
+
+    #- now run the simulation:
     print("now running McRadar simulation")
     radar_sim.initialize(dssnew)
     radar_sim.run()
     print(radar_sim.results)
     output = radar_sim.results['spectra']
     print('done with output, saving at',outName)
+    
     #- calculate moments and noise from the spectra:	
     output['Ze_H'] = output['spec_H'].sum(dim='vel')
     output['Ze_V'] = output['spec_V'].sum(dim='vel')
