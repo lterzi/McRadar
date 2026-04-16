@@ -189,21 +189,33 @@ def calcScatTmatrix(wl, radii, as_ratio,
 
 def radarScat(sp, wl, K2):
     """
-    Calculates the single scattering radar quantities from the matrix values
+    Calculates the single scattering radar quantities from the matrix values.
+
     Parameters
     ----------
-    sp: dataArray [n] superparticles containing backscattering matrix 
-            and forward amplitude matrix information needed to compute
-            spectral radar quantities
-    wl: wavelength [mm]
-    K2: Rayleigh dielectric factor |(m^2-1)/(m^2+2)|^2
+    sp : xarray.DataArray or dict
+        Superparticles containing backscattering and forward amplitude matrix information.
+    wl : float
+        Wavelength [mm].
+    K2 : float
+        Rayleigh dielectric factor $|(m^2-1)/(m^2+2)|^2$.
 
     Returns
     -------
-    reflect_h: super particle horizontal reflectivity[mm^6/m^3] (array[n])
-    reflect_v: super particle vertical reflectivity[mm^6/m^3] (array[n])
-    kdp: calculated kdp from each particle (array[n])
-    rho_hv: correlation coefficient (array[n])
+    reflect_hh : array-like
+        Superparticle horizontal reflectivity $[mm^6/m^3]$.
+    reflect_vv : array-like
+        Superparticle vertical reflectivity $[mm^6/m^3]$.
+    reflect_hv : array-like
+        Cross-polarized reflectivity $[mm^6/m^3]$.
+    kdp : array-like
+        Calculated Kdp from each particle.
+    rho_hv : array-like
+        Correlation coefficient (currently disabled, returns NaN array).
+    cext_hh : array-like
+        Extinction cross-section for horizontal polarization.
+    cext_vv : array-like
+        Extinction cross-section for vertical polarization.
     """
     prefactor = wl**4/(np.pi**5*K2)
     
@@ -231,15 +243,74 @@ def radarScat(sp, wl, K2):
     
     return reflect_hh, reflect_vv, reflect_hv, kdp, rho_hv, cext_hh, cext_vv
 def search_ckdtree(tree, scaling, target):
-	scaled_target = np.array(list(target.values())).T*scaling
-	idx = tree.query_ball_point(scaled_target, r=1.0)
-	return idx 
+    """
+    Search a cKDTree for points within a scaled radius of the target.
+
+    Parameters
+    ----------
+    tree : cKDTree
+        The KDTree object to search.
+    scaling : array-like
+        Scaling factors for each dimension.
+    target : dict
+        Dictionary of target arrays (each key is a variable, values are arrays).
+
+    Returns
+    -------
+    idx : list
+        List of indices for each target point within radius 1.0.
+    """
+    scaled_target = np.array(list(target.values())).T * scaling
+    idx = tree.query_ball_point(scaled_target, r=1.0)
+    return idx 
 def asinh_transform(x, x0=1.0):
-    return np.arcsinh(x/x0)
+    """
+    Apply an inverse hyperbolic sine (asinh) transformation to the input.
+
+    Parameters
+    ----------
+    x : array-like
+        Input data.
+    x0 : float, optional
+        Scale parameter (default 1.0).
+
+    Returns
+    -------
+    transformed : array-like
+        Transformed data.
+    """
+    return np.arcsinh(x / x0)
 def inv_asinh_transform(y, x0=1.0):
+    """
+    Inverse of the asinh transformation.
+
+    Parameters
+    ----------
+    y : array-like
+        Transformed data.
+    x0 : float, optional
+        Scale parameter (default 1.0).
+
+    Returns
+    -------
+    x : array-like
+        Original data before transformation.
+    """
     return x0 * np.sinh(y)
 def suggest_x0(x):
-    """Suggest x0 scale parameter from data"""
+    """
+    Suggest a scale parameter x0 for asinh transformation from data.
+
+    Parameters
+    ----------
+    x : array-like
+        Input data.
+
+    Returns
+    -------
+    x0 : float
+        Suggested scale parameter (10th percentile of nonzero values, or 1.0 if all zero).
+    """
     a = np.abs(np.asarray(x))
     a = a[a > 0]
     if a.size == 0:
@@ -247,24 +318,108 @@ def suggest_x0(x):
     return np.quantile(a, 0.10)  # Use 10th percentile
 
 def scatt_param(r, wl, mm=1.0):
-    return 2.0*np.pi*r*mm/wl
+    """
+    Calculate the size parameter for scattering.
+
+    Parameters
+    ----------
+    r : float or array-like
+        Particle radius (same units as wl).
+    wl : float
+        Wavelength (same units as r).
+    mm : float, optional
+        Refractive index ratio (default 1.0).
+
+    Returns
+    -------
+    param : float or array-like
+        Size parameter (dimensionless).
+    """
+    return 2.0 * np.pi * r * mm / wl
 
 def Q2C(Q, r):
-    return Q*np.pi*r**2
+    """
+    Convert scattering efficiency Q to cross-section C.
+
+    Parameters
+    ----------
+    Q : float or array-like
+        Scattering efficiency.
+    r : float or array-like
+        Particle radius.
+
+    Returns
+    -------
+    C : float or array-like
+        Cross-section area.
+    """
+    return Q * np.pi * r ** 2
 def refl(cbk, wl, Kw2):
-    return wl**4*cbk/(np.pi**5*Kw2)
+    """
+    Calculate radar reflectivity from backscattering cross-section.
+
+    Parameters
+    ----------
+    cbk : float or array-like
+        Backscattering cross-section.
+    wl : float
+        Wavelength.
+    Kw2 : float
+        Dielectric factor.
+
+    Returns
+    -------
+    refl : float or array-like
+        Radar reflectivity.
+    """
+    return wl ** 4 * cbk / (np.pi ** 5 * Kw2)
 def m_water_wl(wl):
+    """
+    Return the refractive index of water for a given wavelength.
+
+    Parameters
+    ----------
+    wl : float
+        Wavelength (mm).
+
+    Returns
+    -------
+    m : complex
+        Refractive index for the closest wavelength.
+    """
     m_c = 8.34 + 2.22j
     m_x = 7.20 + 2.84j
     m_ka = 4.05 + 2.42j
     m_w = 2.89 + 1.43j
     ms = np.array([m_c, m_x, m_ka, m_w])
-    wls = np.array([53.5,31.2,8.4,3.2])
+    wls = np.array([53.5, 31.2, 8.4, 3.2])
     closest = np.argmin(np.abs(wls - wl))
     return ms[closest]
 
 class ZeOperator:
     def __init__(self, settings, DDA_data_agg, DDA_data_cry, treeAgg, scalingAgg, treeCry=None, scalingCry=None, nmono_array=None):
+        """
+        Initialize the ZeOperator class for radar reflectivity calculations.
+
+        Parameters
+        ----------
+        settings : dict or RadarSettings
+            Radar and scattering settings.
+        DDA_data_agg : DataFrame
+            Lookup table for aggregates.
+        DDA_data_cry : DataFrame
+            Lookup table for crystals.
+        treeAgg : cKDTree
+            KDTree for aggregates.
+        scalingAgg : array-like
+            Scaling for aggregate KDTree.
+        treeCry : cKDTree, optional
+            KDTree for crystals.
+        scalingCry : array-like, optional
+            Scaling for crystal KDTree.
+        nmono_array : array-like, optional
+            Number of monomers for aggregates.
+        """
         self.settings = settings
         self.DDA_data_agg = DDA_data_agg
         self.DDA_data_cry = DDA_data_cry
@@ -274,25 +429,58 @@ class ZeOperator:
         self.scalingCry = scalingCry
         self.nmono_array = nmono_array
     def compute(self, mcTableTmp, mcTableAggTmp, mcTableCryTmp, mcTableFrozenTmp, mcTableMeltedTmp, mcTableLiquidTmp, beta_std_use, height):
+        """
+        Main dispatcher: call each handler for the relevant particle type.
+
+        Parameters
+        ----------
+        mcTableTmp : xarray.Dataset
+            Output table to fill.
+        mcTableAggTmp, mcTableCryTmp, mcTableFrozenTmp, mcTableMeltedTmp, mcTableLiquidTmp : xarray.Dataset
+            Input tables for each particle type.
+        beta_std_use : float
+            Standard deviation for canting angle.
+        height : float
+            Height of the radar bin.
+
+        Returns
+        -------
+        mcTableTmp : xarray.Dataset
+            Output table with filled radar variables.
+        """
         # Main dispatcher: call each handler for the relevant particle type
         if len(mcTableCryTmp.sPhi) > 0:
-            self._handle_crystals(mcTableTmp, mcTableCryTmp, height)
+            self._handle_crystals(mcTableTmp, mcTableCryTmp, beta_std_use, height)
         if len(mcTableAggTmp.mTot) > 0:
             self._handle_aggregates(mcTableTmp, mcTableAggTmp, height)
         if len(mcTableFrozenTmp.mTot) > 0:
             self._handle_frozen(mcTableTmp, mcTableFrozenTmp, beta_std_use, height)
         if len(mcTableMeltedTmp.mTot) > 0:
-            self._handle_melted(mcTableTmp, mcTableMeltedTmp, beta_std_use, height)
+            self._handle_melted(mcTableTmp, mcTableMeltedTmp, height)
         if len(mcTableLiquidTmp.mTot) > 0:
             self._handle_liquid(mcTableTmp, mcTableLiquidTmp, beta_std_use, height)
         return mcTableTmp
 
-    def _handle_crystals(self, mcTable, mcTableCry, height):
+    def _handle_crystals(self, mcTable, mcTableCry, beta_std_use, height):
+        """
+        Crystal-specific scattering logic (modularized from calcParticleZe).
+
+        Parameters
+        ----------
+        mcTable : xarray.Dataset
+            Output table to fill.
+        mcTableCry : xarray.Dataset
+            Input table for crystals.
+        beta_std_use : float
+            Standard deviation for canting angle.
+        height : float
+            Height of the radar bin.
+        """
         # Crystal-specific scattering logic (modularized from calcParticleZe)
         import numpy as np
         from sklearn import neighbors
         from scipy.stats import truncnorm
-        print('Handling crystals at height', height, 'with', len(mcTableCry), 'particles')
+        print('Handling crystals at height', height, 'with', len(mcTableCry.mTot), 'particles')
 
         ## so far this is using the non-stochastic crystals, so our old LUT setup because it is faster
         # Example: get settings from self
@@ -302,17 +490,19 @@ class ZeOperator:
     
         # Truncated normal for betas
         lower, upper = 0, 90
-        mu, sigma = scatSet.get('beta', 0), scatSet.get('beta_std', 0)
+        #print(scatSet)
+        #quit()
+        mu, sigma = self.settings.get('beta', 0), beta_std_use#self.settings.get('beta_std', 0)
         a, b = (lower - mu) / sigma, (upper - mu) / sigma
         betas = truncnorm.rvs(a, b, loc=mu, scale=sigma, size=len(mcTableCry.dia))
 
         # Open LUT (assume already loaded in self.DDA_data_cry)
         DDA_data_cry = self.DDA_data_cry
-        print(DDA_data_cry)
-        for var in DDA_data_cry:
-            print(var)
+        #print(DDA_data_cry)
+        #for var in DDA_data_cry:
+        #    print(var)
         #if hasattr(DDA_data_cry, 'to_dataframe'):
-        DDA_data_cry = DDA_data_cry.to_dataframe()
+        #DDA_data_cry = DDA_data_cry.to_dataframe()
 
         for wl in wls:
             wl_close = DDA_data_cry.iloc[(DDA_data_cry['wavelength']-wl).abs().argsort()].wavelength.values[0]
@@ -320,7 +510,7 @@ class ZeOperator:
             for elv in elvs:
                 el_close = DDA_wl_cry.iloc[(DDA_wl_cry['elevation']-elv).abs().argsort()].elevation.values[0]
                 DDA_elv_cry = DDA_wl_cry[DDA_wl_cry.elevation==el_close]
-                print(DDA_elv_cry)
+                #print(DDA_elv_cry)
                 DDA_elv_cry = DDA_elv_cry[DDA_elv_cry.kdp<1]
                 # KNN regression for ZeH, ZeV, etc.
                 pointsCry = np.array(list(zip(DDA_elv_cry.Dmax, DDA_elv_cry.mass, DDA_elv_cry.ar, DDA_elv_cry.beta)))
@@ -379,8 +569,20 @@ class ZeOperator:
                 mcTable['sKDP'].loc[elv, wl, mcTableCry.index] = scatPoints['kdp']
 
     def _handle_aggregates(self, mcTable, mcTableAgg, height):
+        """
+        Aggregate-specific scattering logic (modularized from calcParticleZe).
+
+        Parameters
+        ----------
+        mcTable : xarray.Dataset
+            Output table to fill.
+        mcTableAgg : xarray.Dataset
+            Input table for aggregates.
+        height : float
+            Height of the radar bin.
+        """
         import numpy as np
-        print('Handling aggregates at height', height, 'with', len(mcTableAgg), 'particles')
+        print('Handling aggregates at height', height, 'with', len(mcTableAgg.mTot), 'particles')
         wls = self.settings['wl'] #scatSet['wls'] if 'wls' in scatSet else [scatSet['wl']]
         elvs = self.settings['elv'] #scatSet['elvs'] if 'elvs' in scatSet else [scatSet['elv']]
         treeAgg = self.treeAgg
@@ -427,10 +629,24 @@ class ZeOperator:
                     mcTable[key].loc[dict(elevation=elv, wavelength=wl, index=result.index)] = v
 
     def _handle_frozen(self, mcTable, mcTableFrozen, beta_std_use, height):
+        """
+        Frozen-specific scattering logic (modularized from calcParticleZe).
+
+        Parameters
+        ----------
+        mcTable : xarray.Dataset
+            Output table to fill.
+        mcTableFrozen : xarray.Dataset
+            Input table for frozen particles.
+        beta_std_use : float
+            Standard deviation for canting angle.
+        height : float
+            Height of the radar bin.
+        """
         # Frozen-specific scattering logic (modularized from calcParticleZe)
         import numpy as np
         #from pytmatrix import refractive
-        print('Handling frozen particles at height', height, 'with', len(mcTableFrozen), 'particles')
+        print('Handling frozen particles at height', height, 'with', len(mcTableFrozen.mTot), 'particles')
         scatSet = self.settings['scatSet'] if isinstance(self.settings, dict) and 'scatSet' in self.settings else self.settings
         wls = self.settings['wl'] #scatSet['wls'] if 'wls' in scatSet else [scatSet['wl']]
         elvs = self.settings['elv'] #scatSet['elvs'] if 'elvs' in scatSet else [scatSet['elv']]
@@ -454,16 +670,28 @@ class ZeOperator:
                 mcTable['sCextH'].loc[elv, wl, mcTableFrozen.index] = (S22iMat * 4 * np.pi / (2 * np.pi / wl))
                 mcTable['sCextV'].loc[elv, wl, mcTableFrozen.index] = (S11iMat * 4 * np.pi / (2 * np.pi / wl))
 
-    def _handle_melted(self, mcTable, mcTableMelted, beta_std_use, height):
+    def _handle_melted(self, mcTable, mcTableMelted, height):
+        """
+        Melted-specific scattering logic (modularized from calcParticleZe).
+
+        Parameters
+        ----------
+        mcTable : xarray.Dataset
+            Output table to fill.
+        mcTableMelted : xarray.Dataset
+            Input table for melted particles.
+        height : float
+            Height of the radar bin.
+        """
         # Melted-specific scattering logic (modularized from calcParticleZe)
         import numpy as np
         from scattnlay import scattnlay
         from pytmatrix import refractive
-        print('Handling melted particles at height', height, 'with', len(mcTableMelted), 'particles')
+        print('Handling melted particles at height', height, 'with', len(mcTableMelted.mTot), 'particles')
         scatSet = self.settings['scatSet'] if isinstance(self.settings, dict) and 'scatSet' in self.settings else self.settings
         wls = self.settings['wl'] #scatSet['wls'] if 'wls' in scatSet else [scatSet['wl']]
         elvs = self.settings['elv'] #scatSet['elvs'] if 'elvs' in scatSet else [scatSet['elv']]
-        ice_core = True
+        ice_core = scatSet.get('ice_core', False) # if True, ice core with water coating; if False, water core with ice coating
         for wl in wls:
             for elv in elvs:
                 if ice_core:
@@ -498,12 +726,26 @@ class ZeOperator:
                         mcTable['sCextH'].loc[elv, wl, index] = Cext
 
     def _handle_liquid(self, mcTable, mcTableLiquid, beta_std_use, height):
+        """
+        Liquid-specific scattering logic (modularized from calcParticleZe).
+
+        Parameters
+        ----------
+        mcTable : xarray.Dataset
+            Output table to fill.
+        mcTableLiquid : xarray.Dataset
+            Input table for liquid particles.
+        beta_std_use : float
+            Standard deviation for canting angle.
+        height : float
+            Height of the radar bin.
+        """
         # Liquid-specific scattering logic (modularized from calcParticleZe)
         #import numpy as np
         #import pandas as pd
         import xarray as xr
         from scipy import constants
-        print('Handling liquid particles at height', height, 'with', len(mcTableLiquid), 'particles')
+        print('Handling liquid particles at height', height, 'with', len(mcTableLiquid.mTot), 'particles')
         scatSet = self.settings['scatSet'] if isinstance(self.settings, dict) and 'scatSet' in self.settings else self.settings
         #print(scatSet)
         wls = self.settings['wl'] #scatSet['wls'] if 'wls' in scatSet else [scatSet['wl']]

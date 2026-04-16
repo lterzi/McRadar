@@ -127,7 +127,7 @@ class RadarSettings:
         # Fill in missing scatSet keys
             for k, v in [('mode', 'DDA'), ('safeTmatrix', False), ('K2', 0.93), ('ndgs', 30),
                          ('n_neighbors', 5), ('radius', 1e-10), ('selmode', 'KNeighborsRegressor'),
-                         ('orientational_avg', False), ('ice_core', True)]:
+                         ('orientational_avg', False), ('ice_core', False)]:
                 if k not in self.scatSet:
                     self.scatSet[k] = v
 
