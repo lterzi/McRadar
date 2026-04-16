@@ -1,1 +1,3 @@
 src/mcradar/__pycache__/
+src/mcradar.egg-info/
+examples/data/
