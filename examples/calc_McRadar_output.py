@@ -333,7 +333,7 @@ def ds_get_var(ds, varname, multiplicity=True):
 fileName, radarPosX, number_of_beams,time,path, elv = argv
 print(radarPosX, number_of_beams,time,path)
 radarPosX1 = float(radarPosX)
-outFolder = '/project/meteo/work/L.Terzi/ICON_McSnow_Axel/{}/McRadar/particles0000{}/'.format(path,time)
+outFolder = '{}/McRadar/particles0000{}/'.format(path,time)
 if not os.path.exists(outFolder):
     os.makedirs(outFolder)
 radarPosX = float(radarPosX)
@@ -359,7 +359,7 @@ outName = '{:.1f}GHz_elv{}_output_DDA_kdtree_melted_water_core_oriavgTru_gridVol
 
 # now lets open the dataset and convert it to the format needed for McRadar.
 ginfo = grid_info('Torus_Triangles_1024x4_150m.nc') #gridfile
-file = '/project/meteo/work/L.Terzi/ICON_McSnow_Axel/{}/particles0000{}.000.nc'.format(path, time)
+file = '{}/particles0000{}.000.nc'.format(path, time) # TODO: might need to change that if your folder structure is different
 dss = xr.open_dataset(file)
 dss['x'] = dss.longitude / (2*np.pi) * ginfo['domain_length']
 dss['y'] = dss.latitude              * ginfo['domain_length_y']
