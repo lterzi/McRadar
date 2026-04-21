@@ -234,7 +234,7 @@ class RadarSimulation:
         # Split the table into different particle types
         self.mcTableAgg, self.mcTableCry, self.mcTableFrozen, self.mcTableMelted, self.mcTableLiquid = prepare_mcTable(self.mcTable, self.settings)
         # Load aggregate LUT and add logmass/logDmax for KD-tree
-        self.DDA_data_agg = xr.open_dataset(self.settings['scatSet']['lutPath']+'all_aggregates_small_kdp.nc')
+        self.DDA_data_agg = xr.open_dataset(self.settings['scatSet']['lutPath']+'stochastic_aggregates_rimed.nc') #'all_aggregates_small_kdp.nc')
         self.DDA_data_agg['logmass'] = np.log10(self.DDA_data_agg.mass)
         self.DDA_data_agg['logDmax'] = np.log10(self.DDA_data_agg.Dmax)
         # Load crystal LUT and ensure Dmax is present
@@ -275,12 +275,12 @@ class RadarSimulation:
             print('----------------------------------')
             print(f"Processing height bin: {heightEdge0} - {heightEdge1} m")
             # Select particles in this height bin
-            mcTableTmp = self.mcTable.where((self.mcTable['sHeight']>heightEdge0) & (self.mcTable['sHeight']<=heightEdge1),drop=True)
-            mcTableAggTmp = self.mcTableAgg.where((self.mcTableAgg['sHeight']>heightEdge0) & (self.mcTableAgg['sHeight']<=heightEdge1),drop=True)
-            mcTableCryTmp = self.mcTableCry.where((self.mcTableCry['sHeight']>heightEdge0) & (self.mcTableCry['sHeight']<=heightEdge1),drop=True)
-            mcTableFrozenTmp = self.mcTableFrozen.where((self.mcTableFrozen['sHeight']>heightEdge0) & (self.mcTableFrozen['sHeight']<=heightEdge1),drop=True)
-            mcTableMeltedTmp = self.mcTableMelted.where((self.mcTableMelted['sHeight']>heightEdge0) & (self.mcTableMelted['sHeight']<=heightEdge1),drop=True)
-            mcTableLiquidTmp = self.mcTableLiquid.where((self.mcTableLiquid['sHeight']>heightEdge0) & (self.mcTableLiquid['sHeight']<=heightEdge1),drop=True)
+            mcTableTmp = self.mcTable.where((self.mcTable['sRange']>heightEdge0) & (self.mcTable['sRange']<=heightEdge1),drop=True) # use sRange here because this is correct for non-zenith angles
+            mcTableAggTmp = self.mcTableAgg.where((self.mcTableAgg['sRange']>heightEdge0) & (self.mcTableAgg['sRange']<=heightEdge1),drop=True)
+            mcTableCryTmp = self.mcTableCry.where((self.mcTableCry['sRange']>heightEdge0) & (self.mcTableCry['sRange']<=heightEdge1),drop=True)
+            mcTableFrozenTmp = self.mcTableFrozen.where((self.mcTableFrozen['sRange']>heightEdge0) & (self.mcTableFrozen['sRange']<=heightEdge1),drop=True)
+            mcTableMeltedTmp = self.mcTableMelted.where((self.mcTableMelted['sRange']>heightEdge0) & (self.mcTableMelted['sRange']<=heightEdge1),drop=True)
+            mcTableLiquidTmp = self.mcTableLiquid.where((self.mcTableLiquid['sRange']>heightEdge0) & (self.mcTableLiquid['sRange']<=heightEdge1),drop=True)
             # Only proceed if there are particles in this bin
             if mcTableTmp.vel.any():
                 # Choose beta_std for this bin based on velocity spread

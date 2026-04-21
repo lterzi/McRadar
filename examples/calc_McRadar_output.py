@@ -175,7 +175,7 @@ def select_radar_beam_data(model_data, radar_x, radar_y, radar_z, azimuth, eleva
     # Get particle positions from data variables
     x_pos = model_data['x']
     y_pos = model_data['y'] 
-    z_pos = model_data['sHeight']  # Using sHeight as z coordinate based on your code
+    z_pos = model_data['sHeight']  
     
     # Calculate relative positions from radar
     dx = x_pos - radar_x
@@ -355,7 +355,7 @@ lutPath = '/project/meteo/work/L.Terzi/McRadarTest/LUT/' #'/work/lvonterz/SSRGA/
 # define the velocity vector:
 velVec = np.loadtxt('/project/meteo/work/L.Terzi/ICON_McSnow_Axel/doppler_vel_Xband.csv')
 #-- define output Name: 
-outName = '{:.1f}GHz_elv{}_output_DDA_kdtree_melted_water_core_oriavgTru_gridVolume_beta{}_beta_std{}_particles0000{}.000_radarPosX{}_newMcRadar.nc'.format(freq[0]*1e-9,elv[0],beta,beta_std,time,int(radarPosX1))
+outName = '{:.1f}GHz_elv{}_output_DDA_kdtree_melted_water_core_oriavgTru_gridVolume_beta{}_beta_std{}_particles0000{}.000_radarPosX{}_newsRange.nc'.format(freq[0]*1e-9,elv[0],beta,beta_std,time,int(radarPosX1))
 
 # now lets open the dataset and convert it to the format needed for McRadar.
 ginfo = grid_info('Torus_Triangles_1024x4_150m.nc') #gridfile
@@ -366,6 +366,7 @@ dss['y'] = dss.latitude              * ginfo['domain_length_y']
 
 dss['mTot'] = dss.m_f+ dss.m_w+ dss.m_i+ dss.m_r # mTot is not yet calculated, but we need that for McRadar
 dss = dss.rename({'altitude':'sHeight','noParts':'index','xi':'sMult','d':'dia','mm':'sNmono','phi':'sPhi'})
+
 
 # now we need to select the particles that are within the radar beam, and calculate the radial velocity for those particles, which is needed for the Doppler spectra calculation in McRadar. 
 # We will do this for multiple beams next to each other, and then average the spectra over those
@@ -379,6 +380,14 @@ else:
     heightRes = 36/np.sin(np.deg2rad(elv))[0]
     #dss['sHeight'] = dss.sHeight/np.sin(np.deg2rad(elv))[0]
 
+#- now calculate the distance to the radar for each point. We will need that for the radar simulation.
+radarPosZ = 0
+sRange = np.sqrt((dss['x'] - radarPosX)**2 + (dss['y'] - radarPosY)**2 + (dss['sHeight'] - radarPosZ)**2)
+# If sRange is a DataArray, extract .data for assignment
+if hasattr(sRange, 'data'):
+    dss['sRange'] = (('index',), sRange.data)
+else:
+    dss['sRange'] = (('index',), sRange)
 print(maxRange,heightRes)
 rangeVec = np.arange(0,maxRange,heightRes)
 dssnew = xr.Dataset()
