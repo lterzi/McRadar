@@ -353,7 +353,7 @@ attenuation = False
 ice_core = False
 lutPath = '/project/meteo/work/L.Terzi/McRadarTest/LUT/' #'/work/lvonterz/SSRGA/snowScatt/ssrga_LUT/' #'/data/optimice/McRadarLUTs/'
 # define the velocity vector:
-velVec = np.loadtxt('/project/meteo/work/L.Terzi/ICON_McSnow_Axel/doppler_vel_Xband.csv')
+velVec = np.loadtxt('doppler_vel_Xband.csv')
 #-- define output Name: 
 outName = '{:.1f}GHz_elv{}_output_DDA_kdtree_melted_water_core_oriavgTru_gridVolume_beta{}_beta_std{}_particles0000{}.000_radarPosX{}_newsRange.nc'.format(freq[0]*1e-9,elv[0],beta,beta_std,time,int(radarPosX1))
 
