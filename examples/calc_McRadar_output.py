@@ -330,9 +330,15 @@ def ds_get_var(ds, varname, multiplicity=True):
 # TODO: get frozen mass back in, but maybe make threshold with frozen mass and sphericity, size of particle? Righ now KDP is again ridiculously high at cloud top, so my particles probably don't work..
 # TODO: what if we increase the wobbling in areas where wind is high?
 
-fileName, radarPosX, number_of_beams,time,path, elv = argv
+fileName, radarPosX, number_of_beams,time, path, elv = argv
 print(radarPosX, number_of_beams,time,path)
 radarPosX1 = float(radarPosX)
+if 'particles' in path:
+    file = path
+    path = path.split('particles')[0]
+else: 
+    file = '{}{}'.format(path,time) # TODO: might need to change that if your folder structure is different
+
 outFolder = '{}/McRadar/particles0000{}/'.format(path,time)
 if not os.path.exists(outFolder):
     os.makedirs(outFolder)
@@ -351,7 +357,8 @@ n_neighbors = 10
 scatMode = 'wobbling'
 attenuation = False
 ice_core = False
-lutPath = '/project/meteo/work/L.Terzi/McRadarTest/LUT/' #'/work/lvonterz/SSRGA/snowScatt/ssrga_LUT/' #'/data/optimice/McRadarLUTs/'
+currDir = os.getcwd()
+lutPath = f'{currDir}/../LUT/' #TODO: check if this is the correct path
 # define the velocity vector:
 velVec = np.loadtxt('doppler_vel_Xband.csv')
 #-- define output Name: 
@@ -359,18 +366,18 @@ outName = '{:.1f}GHz_elv{}_output_DDA_kdtree_melted_water_core_oriavgTru_gridVol
 
 # now lets open the dataset and convert it to the format needed for McRadar.
 ginfo = grid_info('Torus_Triangles_1024x4_150m.nc') #gridfile
-file = '{}/particles0000{}.000.nc'.format(path, time) # TODO: might need to change that if your folder structure is different
+
 dss = xr.open_dataset(file)
 dss['x'] = dss.longitude / (2*np.pi) * ginfo['domain_length']
 dss['y'] = dss.latitude              * ginfo['domain_length_y']
 
 dss['mTot'] = dss.m_f+ dss.m_w+ dss.m_i+ dss.m_r # mTot is not yet calculated, but we need that for McRadar
 dss = dss.rename({'altitude':'sHeight','noParts':'index','xi':'sMult','d':'dia','mm':'sNmono','phi':'sPhi'})
-
+#quit()
 
 # now we need to select the particles that are within the radar beam, and calculate the radial velocity for those particles, which is needed for the Doppler spectra calculation in McRadar. 
 # We will do this for multiple beams next to each other, and then average the spectra over those
-radarPosY = -100
+radarPosY = 5
 beamWidth = 0.6 # in degree#
 if elv == 90:
     maxRange = 12000
@@ -402,7 +409,12 @@ for i in range(number_of_beams):
         #if elv == 90:
         #    dss['vel'] = dss.vt+dss.w_vel # vel is combination of vertical wind and fall velocity
         #else:
-        beam_data['vel'] = calculate_radial_velocity(beam_data, 270, elv)
+        try:
+            beam_data['vel'] = calculate_radial_velocity(beam_data, 270, elv)
+        except KeyError as e:
+            print(f"Error calculating radial velocity: {e}")
+            print("now using vt as velocity instead of radial velocity, but that is not ideal")
+            beam_data['vel'] = beam_data.vt
 
         if i == 0 or j==0:
             beam_data = beam_data.assign_coords(index=beam_data.index)
